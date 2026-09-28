@@ -1,0 +1,761 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Joker Hunt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Limelight&family=Figtree:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  /* Casino table palette. The game has one deliberate look, so there is no light theme. */
+  :root {
+    --room: #16110d;
+    --rail: #4a2c1a;
+    --rail-light: #6b4128;
+    --felt: #0f5541;
+    --felt-deep: #083326;
+    --brass: #dcb05a;
+    --brass-dim: #9b7c3e;
+    --ivory: #f7f1e3;
+    --ink: #1e1a15;
+    --suit-red: #b3212c;
+    --fog: #2d3645;
+    --text: #edf2ea;
+    --muted: #a8bdb1;
+    --win: #86dcab;
+    --lose: #ee8a72;
+    --display: "Limelight", "Didot", "Bodoni MT", Georgia, serif;
+    --body: "Figtree", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+    --rx: 37%;
+    --ry: 34%;
+    --card-w: 16%;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse at 50% 0%, #2a1d14 0%, transparent 60%),
+      var(--room);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.45;
+    padding: 24px 16px 40px;
+  }
+
+  .wrap {
+    max-width: 820px;
+    margin-inline: auto;
+    display: grid;
+    gap: 20px;
+  }
+
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px 20px;
+  }
+  h1 {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(2rem, 6vw, 3rem);
+    color: var(--brass);
+    letter-spacing: 0.02em;
+    line-height: 1;
+  }
+  .tagline { margin: 0; color: var(--muted); max-width: 38ch; }
+
+  /* ---------- Table ---------- */
+  .table {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    border-radius: 170px;
+    border: 14px solid var(--rail);
+    box-shadow:
+      0 0 0 2px var(--rail-light),
+      inset 0 0 0 2px var(--brass-dim),
+      inset 0 0 60px rgba(0, 0, 0, 0.55),
+      0 24px 50px rgba(0, 0, 0, 0.5);
+    background: radial-gradient(ellipse at center, #16704f 0%, var(--felt) 45%, var(--felt-deep) 100%);
+  }
+
+  .center {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 44%;
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+    text-align: center;
+  }
+  .round-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .big-mult {
+    font-family: var(--display);
+    font-size: clamp(1.8rem, 6vw, 2.8rem);
+    line-height: 1;
+    color: var(--brass);
+  }
+  .message {
+    min-height: 2.9em;
+    font-size: 0.92rem;
+    text-wrap: balance;
+  }
+  .message.win { color: var(--win); }
+  .message.lose { color: var(--lose); }
+  .felt-print {
+    margin-top: 2px;
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--brass-dim);
+  }
+
+  /* ---------- Cards ---------- */
+  .card {
+    position: absolute;
+    left: calc(50% + var(--x) * var(--rx));
+    top: calc(50% + var(--y) * var(--ry));
+    width: var(--card-w);
+    aspect-ratio: 5 / 7;
+    transform: translate(-50%, -50%);
+    padding: 0;
+    border: 0;
+    background: none;
+    perspective: 900px;
+    cursor: default;
+    container-type: inline-size;
+    transition: left 0.35s ease, top 0.35s ease, transform 0.2s ease;
+  }
+  .table.gather .card { left: 50%; top: 50%; }
+  .table.playing .card:not(.flipped) { cursor: pointer; }
+  .table.playing .card:not(.flipped):hover { transform: translate(-50%, -54%); }
+  .card:focus-visible { outline: 3px solid var(--brass); outline-offset: 4px; border-radius: 8px; }
+
+  .card-inner {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    transition: transform 0.5s cubic-bezier(0.3, 0.7, 0.3, 1);
+  }
+  .card.flipped .card-inner { transform: rotateY(180deg); }
+
+  .face {
+    position: absolute;
+    inset: 0;
+    border-radius: 7cqw;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+  }
+
+  /* The "fog of war" card back: drifting mist over a slate ground. */
+  .back {
+    border: 4cqw solid var(--ivory);
+    background:
+      radial-gradient(circle at 30% 30%, rgba(220, 230, 245, 0.35), transparent 40%),
+      radial-gradient(circle at 70% 60%, rgba(220, 230, 245, 0.28), transparent 45%),
+      radial-gradient(circle at 40% 85%, rgba(220, 230, 245, 0.22), transparent 40%),
+      var(--fog);
+    background-size: 180% 180%, 200% 200%, 160% 160%, auto;
+    animation: drift 9s ease-in-out infinite alternate;
+    display: grid;
+    place-items: center;
+    color: rgba(237, 242, 234, 0.55);
+    font-family: var(--display);
+    font-size: 34cqw;
+  }
+  @keyframes drift {
+    from { background-position: 0% 0%, 100% 0%, 50% 100%, 0 0; }
+    to   { background-position: 100% 100%, 0% 100%, 50% 0%, 0 0; }
+  }
+
+  .front {
+    transform: rotateY(180deg);
+    background: var(--ivory);
+    color: var(--ink);
+    border: 1px solid #d8ceb6;
+    display: grid;
+    place-items: center;
+    font-family: var(--body);
+    font-weight: 700;
+  }
+  .front.red { color: var(--suit-red); }
+  .front .corner {
+    position: absolute;
+    top: 6cqw;
+    left: 8cqw;
+    font-size: 17cqw;
+    line-height: 1;
+    text-align: center;
+  }
+  .front .corner.bottom { top: auto; left: auto; bottom: 6cqw; right: 8cqw; transform: rotate(180deg); }
+  .front .pip { font-size: 48cqw; line-height: 1; }
+
+  .front.joker {
+    background:
+      repeating-linear-gradient(45deg, rgba(220, 176, 90, 0.18) 0 6cqw, transparent 6cqw 12cqw),
+      var(--ivory);
+    color: var(--suit-red);
+  }
+  .front.joker .star { font-size: 40cqw; line-height: 1; color: var(--brass); text-shadow: 0 1px 0 var(--ink); }
+  .front.joker .word {
+    font-family: var(--display);
+    font-size: 17cqw;
+    letter-spacing: 0.04em;
+  }
+  .front.joker .stack { display: grid; justify-items: center; gap: 4cqw; }
+
+  .slot {
+    position: absolute;
+    top: -15cqw;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 26cqw;
+    height: 26cqw;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--rail);
+    border: 1px solid var(--brass-dim);
+    color: var(--brass);
+    font-family: var(--mono);
+    font-size: 14cqw;
+    font-weight: 700;
+    z-index: 2;
+  }
+
+  .card.found .front { box-shadow: 0 0 0 3px var(--brass), 0 0 28px rgba(220, 176, 90, 0.8); }
+  .card.missed-joker .front { box-shadow: 0 0 0 3px var(--lose), 0 0 22px rgba(238, 138, 114, 0.6); }
+  .card.dud .front { filter: brightness(0.82); }
+
+  /* ---------- Controls ---------- */
+  .panel {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 16px 28px;
+    align-items: start;
+    padding: 18px 20px;
+    border-radius: 14px;
+    background: #211912;
+    border: 1px solid #3a2a1d;
+  }
+  .label {
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .balance {
+    font-family: var(--mono);
+    font-weight: 700;
+    font-size: 1.9rem;
+    color: var(--brass);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .balance small { font-size: 0.8rem; color: var(--muted); font-weight: 500; }
+
+  .ladder { display: flex; flex-wrap: wrap; gap: 8px; }
+  .step {
+    flex: 1 1 90px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid #3a2a1d;
+    font-variant-numeric: tabular-nums;
+  }
+  .step b { display: block; font-family: var(--mono); font-size: 1.05rem; color: var(--text); }
+  .step span { font-size: 0.75rem; color: var(--muted); }
+  .step.current { border-color: var(--brass); background: rgba(220, 176, 90, 0.1); }
+  .step.cleared { border-color: #2f5a45; }
+  .step.cleared b { color: var(--win); }
+
+  .actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+
+  .flips { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.9rem; }
+  .pip-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--brass); }
+  .pip-dot.on { background: var(--brass); }
+
+  .bet-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .bet-row input {
+    width: 7.5em;
+    padding: 9px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--brass-dim);
+    background: #120d09;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 1rem;
+  }
+  .chip {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 3px dashed rgba(255, 255, 255, 0.7);
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+  }
+  .chip[data-chip="10"] { background: #2d6fb3; }
+  .chip[data-chip="50"] { background: #b3312d; }
+  .chip[data-chip="100"] { background: #1e1e1e; }
+  .chip[data-chip="max"] { background: #7a4fa0; }
+
+  .btn {
+    padding: 10px 18px;
+    border-radius: 8px;
+    border: 1px solid var(--brass);
+    background: transparent;
+    color: var(--brass);
+    font-family: var(--body);
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+  .btn.primary { background: var(--brass); color: var(--ink); }
+  .btn:hover { filter: brightness(1.12); }
+  .btn:focus-visible, .chip:focus-visible, input:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
+  .error { color: var(--lose); font-size: 0.85rem; min-height: 1.2em; margin: 0; }
+
+  .rules { color: var(--muted); font-size: 0.85rem; margin: 0; }
+  .rules kbd {
+    font-family: var(--mono);
+    font-size: 0.8em;
+    padding: 1px 5px;
+    border: 1px solid #4b3a2b;
+    border-radius: 4px;
+  }
+
+  @media (max-width: 560px) {
+    :root { --rx: 34%; --ry: 38%; --card-w: 18%; }
+    .table { aspect-ratio: 4 / 5; border-radius: 90px; border-width: 10px; }
+    .center { width: 48%; }
+    .message { font-size: 0.8rem; }
+    .felt-print { display: none; }
+    .panel { grid-template-columns: 1fr; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card, .card-inner { transition: none; }
+    .back { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Joker Hunt</h1>
+    <p class="tagline">Six cards, one Joker hidden in the fog. Find it three rounds in a row.</p>
+  </header>
+
+  <div class="table" id="table">
+    <div class="center">
+      <div class="round-label" id="roundLabel">Place your bet</div>
+      <div class="big-mult" id="bigMult">×1.9</div>
+      <div class="message" id="message" aria-live="polite">Pick a bet below and deal the cards.</div>
+      <div class="felt-print">Three flips a round · Jackpot pays 6.8 to 1</div>
+    </div>
+    <!-- Cards are added here by the script. -->
+  </div>
+
+  <section class="panel">
+    <div>
+      <div class="label">Tokens</div>
+      <div class="balance" id="balance">1000</div>
+    </div>
+    <div>
+      <div class="label">Prize ladder</div>
+      <div class="ladder" id="ladder"></div>
+    </div>
+
+    <div class="actions" id="betControls">
+      <div class="bet-row">
+        <label class="label" for="bet" style="margin:0">Bet</label>
+        <input id="bet" type="number" inputmode="numeric" min="10" step="10" value="100">
+        <button class="chip" data-chip="10" type="button" aria-label="Set bet to 10">10</button>
+        <button class="chip" data-chip="50" type="button" aria-label="Set bet to 50">50</button>
+        <button class="chip" data-chip="100" type="button" aria-label="Set bet to 100">100</button>
+        <button class="chip" data-chip="max" type="button" aria-label="Bet all tokens">MAX</button>
+      </div>
+      <button class="btn primary" id="dealBtn" type="button">Deal</button>
+      <button class="btn" id="refillBtn" type="button" hidden>Refill 1000 tokens</button>
+    </div>
+
+    <div class="actions" id="playControls" hidden>
+      <div class="flips"><span>Flips left</span><span id="flipPips" style="display:flex;gap:6px"></span></div>
+    </div>
+
+    <div class="actions" id="choiceControls" hidden>
+      <button class="btn primary" id="riskBtn" type="button">Risk it</button>
+      <button class="btn" id="cashBtn" type="button">Cash out</button>
+    </div>
+
+    <p class="error" id="error" style="grid-column:1/-1"></p>
+  </section>
+
+  <p class="rules">
+    Each round you get three flips to find the Joker. Find it and your prize grows; miss it and the bet is lost.
+    After rounds 1 and 2 you can cash out or risk it for the next step. Click a card or press
+    <kbd>1</kbd>–<kbd>6</kbd> to flip it.
+  </p>
+</div>
+
+<script>
+  // ---- Game settings (same as the C# version) ----
+  const CONFIG = {
+    startingTokens: 1000,
+    minBet: 10,
+    cardCount: 6,
+    rounds: 3,
+    flipsPerRound: 3,
+    multipliers: [1.9, 3.6, 6.8], // total multiplier on the bet after each round
+  };
+
+  const RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
+  const SUITS = [
+    { symbol: "♠", red: false },
+    { symbol: "♥", red: true },
+    { symbol: "♦", red: true },
+    { symbol: "♣", red: false },
+  ];
+
+  // Cards sit in a ring around the center, numbered clockwise like the console version:
+  //      1   2
+  //    6       3
+  //      5   4
+  const SLOT_ANGLES = [-120, -60, 0, 60, 120, 180];
+
+  const STORAGE_KEY = "jokerHunt.tokens";
+  const FLIP_MS = 500;
+  const GATHER_MS = 380;
+
+  // phase: "betting" | "dealing" | "playing" | "choice"
+  const state = {
+    tokens: loadTokens(),
+    bet: 0,
+    round: 0,
+    flipsLeft: 0,
+    jokerIndex: -1,
+    faces: [],
+    flipped: [],
+    phase: "betting",
+  };
+
+  const el = (id) => document.getElementById(id);
+  const table = el("table");
+  const cards = [];
+
+  // ---------- Setup ----------
+  function buildCards() {
+    for (let i = 0; i < CONFIG.cardCount; i++) {
+      const angle = (SLOT_ANGLES[i] * Math.PI) / 180;
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "card";
+      card.style.setProperty("--x", Math.cos(angle).toFixed(4));
+      card.style.setProperty("--y", Math.sin(angle).toFixed(4));
+      card.setAttribute("aria-label", `Card ${i + 1}, face down`);
+      card.innerHTML = `
+        <span class="slot">${i + 1}</span>
+        <span class="card-inner">
+          <span class="face back">?</span>
+          <span class="face front"></span>
+        </span>`;
+      card.addEventListener("click", () => flipCard(i));
+      table.appendChild(card);
+      cards.push(card);
+    }
+  }
+
+  function buildLadder() {
+    el("ladder").innerHTML = CONFIG.multipliers
+      .map((m, i) => `<div class="step" data-step="${i + 1}"><span>Round ${i + 1}</span><b>×${m}</b><span class="step-prize"></span></div>`)
+      .join("");
+  }
+
+  // ---------- Game flow ----------
+  async function startGame() {
+    if (state.phase !== "betting") return;
+    const bet = Math.floor(Number(el("bet").value));
+    if (!Number.isFinite(bet) || bet < CONFIG.minBet) {
+      return showError(`The minimum bet is ${CONFIG.minBet} tokens.`);
+    }
+    if (bet > state.tokens) {
+      return showError(`You only have ${state.tokens} tokens. Lower your bet.`);
+    }
+    showError("");
+
+    state.bet = bet;
+    state.tokens -= bet;
+    state.round = 1;
+    saveTokens();
+    await dealRound();
+  }
+
+  async function dealRound() {
+    state.phase = "dealing";
+    setMessage(`Shuffling for round ${state.round}…`);
+    render();
+
+    // Turn every card face down before the new faces are chosen,
+    // so nothing is visible while the cards are being swapped.
+    cards.forEach((card) => card.classList.remove("flipped", "found", "missed-joker", "dud"));
+    await wait(FLIP_MS);
+
+    state.jokerIndex = randomInt(CONFIG.cardCount);
+    state.faces = [];
+    state.flipped = [];
+    for (let i = 0; i < CONFIG.cardCount; i++) {
+      state.faces.push(i === state.jokerIndex ? { joker: true } : randomCard());
+      state.flipped.push(false);
+      clearFace(i);
+    }
+
+    // Gather the cards in the middle, then deal them back out.
+    table.classList.add("gather");
+    await wait(GATHER_MS);
+    table.classList.remove("gather");
+    await wait(GATHER_MS);
+
+    state.flipsLeft = CONFIG.flipsPerRound;
+    state.phase = "playing";
+    setMessage(`Find the Joker. You have ${state.flipsLeft} flips.`);
+    render();
+  }
+
+  function flipCard(i) {
+    if (state.phase !== "playing" || state.flipped[i]) return;
+
+    state.flipped[i] = true;
+    state.flipsLeft--;
+    showFace(i);
+
+    if (i === state.jokerIndex) {
+      cards[i].classList.add("found");
+      winRound();
+    } else if (state.flipsLeft === 0) {
+      cards[i].classList.add("dud");
+      loseGame(i);
+    } else {
+      cards[i].classList.add("dud");
+      const plural = state.flipsLeft === 1 ? "flip" : "flips";
+      setMessage(`Card ${i + 1} is ${cardName(state.faces[i])}. Not the Joker. ${state.flipsLeft} ${plural} left.`);
+    }
+    render();
+  }
+
+  function winRound() {
+    const prize = payout(state.round);
+
+    if (state.round === CONFIG.rounds) {
+      state.tokens += prize;
+      saveTokens();
+      setMessage(`Jackpot! You cleared all ${CONFIG.rounds} rounds and win ${prize} tokens.`, "win");
+      state.phase = "betting";
+      return;
+    }
+
+    const next = payout(state.round + 1);
+    state.phase = "choice";
+    setMessage(`You found the Joker! Cash out ${prize}, or risk it for ${next}?`, "win");
+    el("cashBtn").textContent = `Cash out ${prize}`;
+    el("riskBtn").textContent = `Risk it for ${next}`;
+  }
+
+  async function loseGame(lastPick) {
+    state.phase = "betting";
+    setMessage(`Card ${lastPick + 1} is ${cardName(state.faces[lastPick])}. The fog lifts…`, "lose");
+    render();
+
+    // Reveal the rest of the table one card at a time.
+    for (let i = 0; i < CONFIG.cardCount; i++) {
+      if (state.flipped[i]) continue;
+      await wait(160);
+      state.flipped[i] = true;
+      showFace(i);
+      cards[i].classList.add(i === state.jokerIndex ? "missed-joker" : "dud");
+    }
+    setMessage(`The Joker was under card ${state.jokerIndex + 1}. You lose your ${state.bet} token bet.`, "lose");
+    render();
+  }
+
+  function cashOut() {
+    if (state.phase !== "choice") return;
+    const prize = payout(state.round);
+    state.tokens += prize;
+    saveTokens();
+    state.phase = "betting";
+    setMessage(`You cashed out ${prize} tokens.`, "win");
+    render();
+  }
+
+  async function riskIt() {
+    if (state.phase !== "choice") return;
+    state.round++;
+    await dealRound();
+  }
+
+  function refill() {
+    state.tokens = CONFIG.startingTokens;
+    saveTokens();
+    setMessage("Fresh stack of tokens. Good luck!");
+    render();
+  }
+
+  // ---------- Rendering ----------
+  function render() {
+    el("balance").innerHTML = `${state.tokens} <small>tokens</small>`;
+
+    const inGame = state.phase !== "betting";
+    const shownRound = inGame ? state.round : 1;
+    el("roundLabel").textContent = inGame ? `Round ${state.round} of ${CONFIG.rounds}` : "Place your bet";
+    el("bigMult").textContent = `×${CONFIG.multipliers[shownRound - 1]}`;
+
+    // Prize ladder: highlight the current step and show token amounts once a bet is placed.
+    document.querySelectorAll(".step").forEach((step) => {
+      const n = Number(step.dataset.step);
+      const cleared = inGame && (n < state.round || (n === state.round && state.phase === "choice"));
+      step.classList.toggle("current", inGame && n === state.round && !cleared);
+      step.classList.toggle("cleared", cleared);
+      const bet = inGame ? state.bet : Math.floor(Number(el("bet").value)) || 0;
+      step.querySelector(".step-prize").textContent = bet > 0 ? `${payout(n, bet)} tokens` : "";
+    });
+
+    el("betControls").hidden = inGame;
+    el("playControls").hidden = !(state.phase === "playing" || state.phase === "dealing");
+    el("choiceControls").hidden = state.phase !== "choice";
+
+    const broke = state.tokens < CONFIG.minBet;
+    el("dealBtn").hidden = broke;
+    el("refillBtn").hidden = !broke;
+    el("bet").max = state.tokens;
+
+    el("flipPips").innerHTML = Array.from({ length: CONFIG.flipsPerRound }, (_, i) =>
+      `<span class="pip-dot ${i < state.flipsLeft ? "on" : ""}"></span>`).join("");
+
+    table.classList.toggle("playing", state.phase === "playing");
+    cards.forEach((card, i) => {
+      const face = state.flipped[i] ? cardName(state.faces[i]) : "face down";
+      card.setAttribute("aria-label", `Card ${i + 1}, ${face}`);
+    });
+  }
+
+  function showFace(i) {
+    const face = state.faces[i];
+    const front = cards[i].querySelector(".front");
+    if (face.joker) {
+      front.className = "face front joker";
+      front.innerHTML = `<span class="stack"><span class="star">★</span><span class="word">JOKER</span></span>`;
+    } else {
+      front.className = "face front" + (face.suit.red ? " red" : "");
+      const corner = `${face.rank}<br>${face.suit.symbol}`;
+      front.innerHTML = `
+        <span class="corner">${corner}</span>
+        <span class="pip">${face.suit.symbol}</span>
+        <span class="corner bottom">${corner}</span>`;
+    }
+    cards[i].classList.add("flipped");
+  }
+
+  // Face-down cards carry no face in the page, so the fog can't be peeked through.
+  function clearFace(i) {
+    const front = cards[i].querySelector(".front");
+    front.className = "face front";
+    front.innerHTML = "";
+  }
+
+  function setMessage(text, tone) {
+    const m = el("message");
+    m.textContent = text;
+    m.className = "message" + (tone ? " " + tone : "");
+  }
+
+  function showError(text) {
+    el("error").textContent = text;
+  }
+
+  // ---------- Helpers ----------
+  function payout(round, bet = state.bet) {
+    return Math.floor(bet * CONFIG.multipliers[round - 1]);
+  }
+
+  function randomCard() {
+    return { rank: RANKS[randomInt(RANKS.length)], suit: SUITS[randomInt(SUITS.length)] };
+  }
+
+  function cardName(face) {
+    return face.joker ? "the Joker" : face.rank + face.suit.symbol;
+  }
+
+  function randomInt(max) {
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    return buf[0] % max;
+  }
+
+  function wait(ms) {
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    return new Promise((resolve) => setTimeout(resolve, reduced ? Math.min(ms, 60) : ms));
+  }
+
+  function loadTokens() {
+    try {
+      const saved = Number(localStorage.getItem(STORAGE_KEY));
+      if (Number.isFinite(saved) && saved > 0) return Math.floor(saved);
+    } catch (e) { /* storage unavailable: start fresh */ }
+    return CONFIG.startingTokens;
+  }
+
+  function saveTokens() {
+    try { localStorage.setItem(STORAGE_KEY, String(state.tokens)); } catch (e) { /* ignore */ }
+  }
+
+  // ---------- Events ----------
+  el("dealBtn").addEventListener("click", startGame);
+  el("cashBtn").addEventListener("click", cashOut);
+  el("riskBtn").addEventListener("click", riskIt);
+  el("refillBtn").addEventListener("click", refill);
+  el("bet").addEventListener("input", () => { showError(""); render(); });
+  el("bet").addEventListener("keydown", (e) => { if (e.key === "Enter") startGame(); });
+
+  document.querySelectorAll(".chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const value = chip.dataset.chip === "max" ? state.tokens : Number(chip.dataset.chip);
+      el("bet").value = Math.min(value, state.tokens);
+      showError("");
+      render();
+    });
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "INPUT") return;
+    const n = Number(e.key);
+    if (n >= 1 && n <= CONFIG.cardCount) flipCard(n - 1);
+  });
+
+  buildCards();
+  buildLadder();
+  render();
+</script>
+</body>
+</html>
