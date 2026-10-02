@@ -6,6 +6,7 @@ palette, a dark sprite outline, and the same crypt backdrop. The empowered form
 (shown after Animate Dead) stands in a green spectral aura.
 
 Usage: python3 make_card_art.py   (needs Pillow and numpy; reads cutouts/, writes ../img/)
+Then run ../build.py to embed the new pictures into index.html.
 """
 import random
 from pathlib import Path
