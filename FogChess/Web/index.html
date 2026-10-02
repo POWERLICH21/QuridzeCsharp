@@ -329,7 +329,7 @@ body.covered { overflow: hidden; }
 <div class="app">
   <header class="masthead">
     <h1>Fog of War Chess</h1>
-    <p>Two players, one screen. You only see one square around each of your pieces. There is no check: capture the king to win.</p>
+    <p>Play White against Claude, or pass the screen to a friend. You only see one square around each of your pieces. There is no check: capture the king to win.</p>
   </header>
 
   <main class="table">
@@ -340,6 +340,9 @@ body.covered { overflow: hidden; }
       <div class="banner" id="banner" hidden>
         <span class="banner-text" id="bannerText"></span>
         <button type="button" class="btn primary" id="endTurn">End turn</button>
+        <button type="button" class="btn" id="stopThinking">Stop</button>
+        <button type="button" class="btn primary" id="retryClaude">Try again</button>
+        <button type="button" class="btn" id="botMove">Let the bot move</button>
       </div>
       <div class="promo" id="promo" hidden>
         <div class="promo-card" role="dialog" aria-labelledby="promoTitle">
@@ -375,7 +378,8 @@ body.covered { overflow: hidden; }
       </section>
 
       <div class="actions">
-        <button type="button" class="btn" id="newGame">New game</button>
+        <button type="button" class="btn" id="newClaude">New game vs Claude</button>
+        <button type="button" class="btn" id="newFriend">New game, two players</button>
         <div class="confirm" id="confirm" hidden>
           <span>Abandon this game?</span>
           <button type="button" class="btn primary" id="confirmYes">Start over</button>
@@ -386,7 +390,8 @@ body.covered { overflow: hidden; }
       <details class="rules">
         <summary>Rules</summary>
         <ul>
-          <li>Between turns the board is covered. Pass the screen and let the other player reveal it.</li>
+          <li>Against Claude you play White. Claude only gets Black's view: the squares Black can see, Black's moves, and what Black learned from yours.</li>
+          <li>Against a friend, the board is covered between turns. Pass the screen and let the other player reveal it.</li>
           <li>You see the squares next to your pieces, one step in every direction. Everything else is fog.</li>
           <li>There is no check or checkmate. Capturing the enemy king wins, so guard yours.</li>
           <li>You may move into the fog. A rook, bishop or queen that runs into a hidden enemy stops there and captures it.</li>
@@ -687,8 +692,7 @@ function describeForMover(r) {
 }
 
 // Only mentions what the other player can actually see.
-function describeForOpponent(r) {
-  const who = COLOR_NAMES[r.mover];
+function describeForOpponent(r, who = COLOR_NAMES[r.mover]) {
   let text;
   if (!r.blocked && r.opponentSaw.to) {
     text = r.castled ? `${who} castled.` : `${who}'s ${PIECE_NAMES[r.piece]} moved to ${squareName(r.to)}`
@@ -721,14 +725,124 @@ function notationSeenByOpponent(r) {
 }
 </script>
 
+<script id="opponent">
+// The computer opponent. Everything here works only from what the side to move can see,
+// so whoever plays Black (Claude or the fallback bot) never learns what is hidden in the fog.
+const PIECE_VALUES = { P: 1, N: 3, B: 3, R: 5, Q: 9, K: 100 };
+
+function legalMoves(game) {
+  const moves = [];
+  for (let sq = 0; sq < 64; sq++) moves.push(...game.movesFrom(sq));
+  return moves;
+}
+
+const moveCode = (m) => squareName(m.from) + squareName(m.to);
+
+// A simple fallback player: take what it can see, develop pieces, head for the centre.
+function botMove(game) {
+  const color = game.side;
+  const visible = game.visibility(color);
+  const homeRank = color === WHITE ? 0 : 7;
+  let best = null, bestScore = -Infinity;
+  for (const m of legalMoves(game)) {
+    const piece = game.board[m.from];
+    const target = visible[m.to] ? game.board[m.to] : null;
+    let score = Math.random() * 0.6;
+    if (target) score += PIECE_VALUES[target.t] * 10 - PIECE_VALUES[piece.t] * 0.5;
+    score += (3.5 - Math.abs(3.5 - fileOf(m.to))) * 0.15 + (3.5 - Math.abs(3.5 - rankOf(m.to))) * 0.1;
+    if ((piece.t === "N" || piece.t === "B") && rankOf(m.from) === homeRank) score += 0.8;
+    if (piece.t === "K") score += Math.abs(fileOf(m.to) - fileOf(m.from)) === 2 ? 1.5 : -1.5;
+    if (piece.t === "Q" && game.moveCount < 10) score -= 0.8;
+    if (score > bestScore) {
+      bestScore = score;
+      best = m;
+    }
+  }
+  return best && game.isPromotion(best) ? { ...best, promotion: "Q" } : best;
+}
+
+// The side to move's view as text: "?" is fog.
+function describeView(game, color) {
+  const visible = game.visibility(color);
+  const rows = [];
+  for (let rank = 7; rank >= 0; rank--) {
+    let row = `${rank + 1} |`;
+    for (let file = 0; file < 8; file++) {
+      const sq = square(file, rank);
+      const piece = game.board[sq];
+      row += " " + (!visible[sq] ? "?" : !piece ? "." : piece.c === WHITE ? piece.t : piece.t.toLowerCase());
+    }
+    rows.push(row);
+  }
+  rows.push("    a b c d e f g h");
+  return rows.join("\n");
+}
+
+function claudePrompt(game) {
+  const me = game.side, them = opponent(me);
+  const history = game.history.map((r, i) => {
+    const text = r.mover !== me ? notationSeenByOpponent(r)
+      : notation(r) + (r.blocked ? " (castling blocked)" : r.interrupted ? " (stopped by a hidden piece)"
+        : r.captureWasHidden ? " (captured a hidden piece)" : "");
+    return (i % 2 === 0 ? `${i / 2 + 1}. ` : "") + text;
+  }).join(" ");
+  const lastMove = game.lastMove?.mover === them ? describeForOpponent(game.lastMove, COLOR_NAMES[them]) : "";
+  const pieceList = (pieces) => pieces.map((p) => PIECE_NAMES[p.t]).join(", ") || "none";
+  const taken = game.history.filter((r) => r.captured && r.mover === me).map((r) => r.captured);
+  const lost = game.history.filter((r) => r.captured && r.mover === them).map((r) => r.captured);
+  const moves = legalMoves(game).map(moveCode);
+
+  return `You are playing ${COLOR_NAMES[me]} in a game of Fog of War Chess against a person playing ${COLOR_NAMES[them]}. Choose your next move.
+
+Rules of this variant:
+- You only see squares within one step (including diagonals) of your own pieces. Everything else is fog: it may be empty or hide enemy pieces.
+- There is no check or checkmate. You win by capturing the enemy king and lose if yours is captured, possibly without warning.
+- You may move into the fog. A rook, bishop or queen sliding through fog stops at the first hidden enemy piece and captures it. A pawn's two-square move stops after one square if a hidden piece blocks the second square. Castling fails, and the turn is lost, if a hidden piece is in the way.
+- Both sides started from the normal chess position. En passant and promotion work as usual.
+
+Your view, rank 8 at the top. Uppercase = White, lowercase = Black, "." = empty square you can see, "?" = fog:
+${describeView(game, me)}
+
+Move history as you know it (long algebraic notation; ▒▒ is a square you could not see):
+${history || "No moves yet."}
+${lastMove ? `\nWhat you saw of ${COLOR_NAMES[them]}'s last move: ${lastMove}\n` : ""}
+Pieces you have captured: ${pieceList(taken)}. Pieces you have lost: ${pieceList(lost)}.
+
+Your legal moves, judged from what you can see: ${moves.join(", ")}
+
+Reply with only JSON like {"move": "e7e5", "remark": "Into the fog we go."}. "move" must be copied exactly from the list above. Add "promotion": "Q", "R", "B" or "N" only when a pawn reaches the last rank. "remark" is one short, friendly sentence to your opponent (under 100 characters) that does not give away your plans.`;
+}
+
+// Turns Claude's reply into one of the legal moves, or null.
+function parseClaudeMove(game, reply) {
+  const squares = String(reply?.move ?? "").toLowerCase().match(/[a-h][1-8]/g);
+  if (!squares || squares.length < 2) return null;
+  const move = legalMoves(game).find((m) => moveCode(m) === squares[0] + squares[1]);
+  if (!move) return null;
+  if (!game.isPromotion(move)) return move;
+  const promotion = String(reply?.promotion ?? "Q").toUpperCase();
+  return { ...move, promotion: ["Q", "R", "B", "N"].includes(promotion) ? promotion : "Q" };
+}
+</script>
+
 <script>
 const GLYPHS = { K: "♚", Q: "♛", R: "♜", B: "♝", N: "♞", P: "♟" };
-const STORAGE_KEY = "fog-of-war-chess-v1";
+const STORAGE_KEY = "fog-of-war-chess-v2";
 const $ = (id) => document.getElementById(id);
 
-// Phases: "handoff" (board covered between turns), "playing", "promotion", "done" (move made, mover looks), "over".
-let game, phase, viewer, message;
-let selected = null, selectedMoves = [], pendingPromotion = null;
+// Modes: "claude" (you are White, the computer is Black) or "friend" (two players pass the screen).
+// Phases: "handoff" (board covered between friends' turns), "playing", "promotion", "done" (move made, mover looks),
+// "thinking" (the computer is choosing), "stuck" (Claude could not answer), "over".
+let game, mode, phase, viewer, message;
+let selected = null, selectedMoves = [], pendingPromotion = null, pendingMode = null;
+let thinking = null; // { controller, started, timer } while Claude is choosing
+let claudeReachable = null; // null until known; false means the built-in bot plays
+
+const samplePromise = Promise.resolve(window.claude?.use?.("sample") ?? null).catch(() => null);
+samplePromise.then((sample) => {
+  claudeReachable = Boolean(sample);
+  if (game) render();
+});
 
 const squares = [];
 for (let i = 0; i < 64; i++) {
@@ -756,17 +870,33 @@ function pieceHtml(piece) {
   return `<span class="piece ${piece.c}">${GLYPHS[piece.t]}</span>`;
 }
 
+const opponentName = () => (claudeReachable === false ? "the bot" : "Claude");
+
 // ---------- Turn flow ----------
 
-function newGame() {
+function newGame(newMode) {
+  cancelThinking();
+  mode = newMode;
   game = new Game();
   viewer = WHITE;
   phase = "playing";
-  message = "White moves first. You can see one square around each of your pieces; the rest is fog.";
+  message = mode === "claude"
+    ? `You play White against ${opponentName()}. You can see one square around each of your pieces; the rest is fog.`
+    : "White moves first. You can see one square around each of your pieces; the rest is fog.";
   clearSelection();
   $("confirm").hidden = true;
   save();
   render();
+}
+
+function requestNewGame(newMode) {
+  if (game.moveCount > 0 && !game.over) {
+    pendingMode = newMode;
+    $("confirm").hidden = false;
+    $("confirmYes").focus();
+  } else {
+    newGame(newMode);
+  }
 }
 
 function startTurn() {
@@ -780,16 +910,17 @@ function startTurn() {
 function play(move) {
   const result = game.makeMove(move);
   clearSelection();
+  message = describeForMover(result);
   if (game.over) {
     phase = "over";
-    message = `${describeForMover(result)} ${game.endReason}`;
+    message += " " + resultText();
   } else {
-    phase = "done";
-    message = describeForMover(result);
+    phase = mode === "claude" ? "thinking" : "done";
   }
   save();
   render();
-  if (phase === "done") $("endTurn").focus();
+  if (phase === "thinking") askOpponent();
+  else if (phase === "done") $("endTurn").focus();
 }
 
 function endTurn() {
@@ -798,6 +929,81 @@ function endTurn() {
   save();
   render();
   $("reveal").focus();
+}
+
+// Claude chooses Black's move from Black's view only; the bot steps in when Claude can't.
+async function askOpponent() {
+  const sample = claudeReachable === false ? null : await samplePromise;
+  if (phase !== "thinking") return;
+  if (!sample) {
+    claudeReachable = false;
+    playOpponent(botMove(game), "unavailable");
+    return;
+  }
+  const gameAtStart = game;
+  const controller = new AbortController();
+  thinking = { controller, started: Date.now(), timer: setInterval(renderThinking, 1000) };
+  render();
+  try {
+    const reply = await sample.json(claudePrompt(game), { signal: controller.signal });
+    if (game !== gameAtStart || phase !== "thinking") return;
+    stopThinking();
+    const move = parseClaudeMove(game, reply);
+    const remark = typeof reply?.remark === "string" ? reply.remark.trim().slice(0, 140) : "";
+    if (move) playOpponent(move, "claude", remark);
+    else playOpponent(botMove(game), "fallback");
+  } catch (e) {
+    if (game !== gameAtStart) return;
+    stopThinking();
+    const code = e?.code;
+    if (code === "cancelled") {
+      if (phase === "thinking") playOpponent(botMove(game), "stopped");
+    } else if (["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed"].includes(code)) {
+      claudeReachable = false;
+      playOpponent(botMove(game), "unavailable");
+    } else if (code === "invalid_json") {
+      playOpponent(botMove(game), "fallback");
+    } else {
+      phase = "stuck";
+      message = code === "rate_limited" ? "Claude is busy or your usage limit was reached."
+        : code === "session_expired" ? "Your Claude session expired. Sign in again, then try again."
+        : "Claude couldn't answer this time.";
+      message += " Try again, or let the built-in bot make this move.";
+      save();
+      render();
+    }
+  }
+}
+
+function playOpponent(move, source, remark = "") {
+  const result = game.makeMove(move);
+  const notes = {
+    stopped: "You stopped Claude, so the built-in bot moved instead. ",
+    unavailable: "Claude can't be reached from this page, so the built-in bot is playing Black. ",
+    fallback: "Claude's answer had no legal move in it, so the built-in bot moved instead. ",
+  };
+  message = (notes[source] ?? "") + describeForOpponent(result, source === "claude" ? "Claude" : "The bot");
+  if (remark) message += ` Claude says: “${remark}”`;
+  phase = game.over ? "over" : "playing";
+  message += game.over ? " " + resultText() : " Your move.";
+  save();
+  render();
+}
+
+function resultText() {
+  if (mode !== "claude" || !game.winner) return game.endReason;
+  return game.winner === WHITE ? `You win! You captured ${opponentName()}'s king.` : `${opponentName() === "Claude" ? "Claude wins" : "The bot wins"} by capturing your king.`;
+}
+
+function stopThinking() {
+  if (thinking) clearInterval(thinking.timer);
+  thinking = null;
+}
+
+function cancelThinking() {
+  const current = thinking;
+  stopThinking();
+  current?.controller.abort();
 }
 
 function clearSelection() {
@@ -884,11 +1090,16 @@ function renderBoard(covered) {
     el.setAttribute("aria-label", `${squareName(sq)}, ${contents}${isTarget ? ", move here" : ""}`);
   }
 
-  $("banner").hidden = !(phase === "done" || phase === "over");
+  $("banner").hidden = !["done", "thinking", "stuck", "over"].includes(phase);
   $("banner").classList.toggle("center", phase === "over");
   $("endTurn").hidden = phase !== "done";
+  $("stopThinking").hidden = phase !== "thinking" || !thinking;
+  $("retryClaude").hidden = phase !== "stuck";
+  $("botMove").hidden = phase !== "stuck";
   if (phase === "done") $("bannerText").textContent = "Move made. Pass the screen when you are done looking.";
-  if (phase === "over") $("bannerText").textContent = game.endReason;
+  if (phase === "thinking") renderThinking();
+  if (phase === "stuck") $("bannerText").textContent = "Claude couldn't move.";
+  if (phase === "over") $("bannerText").textContent = resultText();
 
   $("promo").hidden = phase !== "promotion";
   for (const button of $("promoChoices").children) {
@@ -896,16 +1107,30 @@ function renderBoard(covered) {
   }
 }
 
+function renderThinking() {
+  if (phase !== "thinking") return;
+  const seconds = thinking ? Math.floor((Date.now() - thinking.started) / 1000) : 0;
+  $("bannerText").textContent = `${opponentName() === "Claude" ? "Claude is" : "The bot is"} thinking…${seconds >= 3 ? ` ${seconds}s` : ""}`;
+}
+
 function renderLedger(covered) {
   const moveNumber = Math.floor(game.moveCount / 2) + 1;
+  const versus = mode === "claude" ? `You vs ${opponentName()}` : "Two players";
   if (covered) {
     $("turnKing").className = `piece ${game.side}`;
     $("turnEyebrow").textContent = `Move ${moveNumber}`;
     $("turnTitle").textContent = `${COLOR_NAMES[game.side]} to move`;
   } else if (phase === "over") {
     $("turnKing").className = `piece ${game.winner ?? viewer}`;
-    $("turnEyebrow").textContent = "Game over · board revealed";
-    $("turnTitle").textContent = game.winner ? `${COLOR_NAMES[game.winner]} wins` : "Draw";
+    $("turnEyebrow").textContent = `${versus} · board revealed`;
+    $("turnTitle").textContent = !game.winner ? "Draw"
+      : mode === "claude" ? (game.winner === WHITE ? "You win" : `${opponentName() === "Claude" ? "Claude" : "The bot"} wins`)
+      : `${COLOR_NAMES[game.winner]} wins`;
+  } else if (mode === "claude") {
+    const computerTurn = phase === "thinking" || phase === "stuck";
+    $("turnKing").className = `piece ${computerTurn ? BLACK : WHITE}`;
+    $("turnEyebrow").textContent = `Move ${moveNumber} · ${versus}`;
+    $("turnTitle").textContent = computerTurn ? `${opponentName() === "Claude" ? "Claude's" : "The bot's"} move` : "Your move";
   } else {
     $("turnKing").className = `piece ${viewer}`;
     $("turnEyebrow").textContent = `Move ${moveNumber} · ${COLOR_NAMES[viewer]}'s view`;
@@ -939,14 +1164,14 @@ function renderLedger(covered) {
   $("taken").innerHTML = setHtml(mine);
   $("lost").innerHTML = setHtml(theirs);
 
-  $("newGame").textContent = phase === "over" ? "Play again" : "New game";
-  $("newGame").classList.toggle("primary", phase === "over");
+  $("newClaude").textContent = `New game vs ${opponentName()}`;
+  $("newClaude").classList.toggle("primary", phase === "over");
 }
 
 // ---------- Saving (per browser) and live updates ----------
 
 function snapshot() {
-  return { game: JSON.parse(JSON.stringify(game)), phase, viewer, message };
+  return { game: JSON.parse(JSON.stringify(game)), mode, phase, viewer, message };
 }
 
 function save() {
@@ -956,9 +1181,15 @@ function save() {
 function restore(saved, keepPhase) {
   if (!saved?.game || !Array.isArray(saved.game.board) || saved.game.board.length !== 64) return false;
   game = new Game(saved.game);
-  viewer = saved.viewer === BLACK ? BLACK : WHITE;
+  mode = saved.mode === "friend" ? "friend" : "claude";
   message = saved.message ?? "";
   phase = saved.phase;
+  if (mode === "claude") {
+    viewer = WHITE;
+    if (phase !== "over") phase = game.side === WHITE ? "playing" : "thinking";
+    return true;
+  }
+  viewer = saved.viewer === BLACK ? BLACK : WHITE;
   if (!keepPhase && phase !== "over") {
     // After a reload, cover the board: whoever is looking may not be the player to move.
     phase = game.moveCount > 0 ? "handoff" : "playing";
@@ -974,24 +1205,31 @@ function start(data) {
     try { loaded = restore(JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"), false); } catch { loaded = false; }
   }
   if (!loaded) {
-    newGame();
+    newGame("claude");
     return;
   }
   clearSelection();
   render();
+  if (phase === "thinking") askOpponent();
 }
 
 // ---------- Controls ----------
 
 $("endTurn").addEventListener("click", endTurn);
+$("stopThinking").addEventListener("click", () => thinking?.controller.abort());
+$("retryClaude").addEventListener("click", () => {
+  phase = "thinking";
+  message = "Asking Claude again.";
+  render();
+  askOpponent();
+});
+$("botMove").addEventListener("click", () => playOpponent(botMove(game), "bot"));
 $("reveal").addEventListener("click", startTurn);
 $("promoCancel").addEventListener("click", cancelPromotion);
 $("promo").addEventListener("click", (e) => { if (e.target === $("promo")) cancelPromotion(); });
-$("newGame").addEventListener("click", () => {
-  if (game.moveCount > 0 && !game.over) $("confirm").hidden = false;
-  else newGame();
-});
-$("confirmYes").addEventListener("click", newGame);
+$("newClaude").addEventListener("click", () => requestNewGame("claude"));
+$("newFriend").addEventListener("click", () => requestNewGame("friend"));
+$("confirmYes").addEventListener("click", () => newGame(pendingMode ?? mode));
 $("confirmNo").addEventListener("click", () => { $("confirm").hidden = true; });
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
