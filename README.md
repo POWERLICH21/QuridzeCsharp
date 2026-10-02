@@ -48,3 +48,11 @@ class Program
 
 
 
+
+## Necropolis Casino (web game)
+
+A dark-fantasy betting card game in a single HTML file: [`necropolis-casino/index.html`](necropolis-casino/index.html).
+
+**Play:** open `necropolis-casino/index.html` in any modern browser (it loads Tailwind and the Cinzel font from their CDNs, so it needs an internet connection).
+
+**Rules:** bet gold, then draw five undead units. Each round you get one spell: *Animate Dead* doubles one of your stacks, *Implosion* destroys an enemy stack (enemy cards stay face down until you resolve the round). The AI casts its own spell when the round resolves. After three rounds the stronger army wins double the pot. Your gold balance is saved in the browser.

@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Necropolis Casino</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        /* Layout: a crypt card table, enemy rank on top, wager belt across the middle, your rank below. */
+        :root {
+            color-scheme: dark;
+            --bg: #0a0a0c;
+            --bg-glow: #1a1a24;
+            --bg-deep: #050505;
+            --fg: #e5e7eb;
+            --muted: #9ca3af;
+            --panel: rgba(20, 20, 25, 0.8);
+            --line: #374151;
+            --line-strong: #4b5563;
+            --card-ink: #111115;
+            --card-ink-hi: #1f1f2a;
+            --ally: #22c55e;
+            --enemy: #a855f7;
+            --void: #7e22ce;
+            --font-display: 'Cinzel', 'Trajan Pro', 'Times New Roman', serif;
+            /* Card width: five cards plus gaps and gutters always fit the screen */
+            --cw: min(130px, calc((100vw - 80px) / 5));
+        }
+        @media (min-width: 640px) {
+            :root { --cw: min(130px, calc((100vw - 128px) / 5)); }
+        }
+
+        html { height: 100%; }
+
+        body {
+            min-height: 100%;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            font-family: var(--font-display);
+            background-color: var(--bg);
+            background-image: radial-gradient(circle at 50% 50%, var(--bg-glow) 0%, var(--bg-deep) 100%);
+            color: var(--fg);
+            overflow-x: hidden;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .crypt-table {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding-block: 1.5rem;
+            padding-inline: 16px;
+        }
+
+        /* 3D Card Mechanics */
+        .card-slot {
+            width: var(--cw);
+            height: calc(var(--cw) * 1.385);
+            position: relative;
+        }
+
+        /* Random tabletop offset lives on the wrapper; animations run on .card-fx so they never erase it */
+        .card-wrapper {
+            position: absolute;
+            inset: 0;
+            perspective: 800px;
+            border-radius: 0.5rem;
+            transition: transform 0.3s ease, filter 0.3s ease;
+        }
+
+        .card-fx {
+            width: 100%;
+            height: 100%;
+            border-radius: 0.5rem;
+            perspective: 1000px;
+            transition: scale 0.2s ease;
+        }
+
+        .card {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+
+        .card.face-down {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            position: absolute;
+            inset: 0;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            border-radius: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: calc(var(--cw) * 0.06);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+            background-color: var(--card-ink);
+        }
+
+        .card-front {
+            border: 2px solid;
+            background: linear-gradient(180deg, var(--card-ink-hi) 0%, var(--card-ink) 100%);
+        }
+
+        .card-back {
+            background: repeating-linear-gradient(45deg, #0f0f13, #0f0f13 10px, var(--bg-glow) 10px, var(--bg-glow) 20px);
+            border: 2px solid var(--line);
+            transform: rotateY(180deg);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-back::after {
+            content: '☥';
+            font-size: calc(var(--cw) * 0.37);
+            color: var(--line);
+        }
+
+        .card-name {
+            font-size: max(8px, calc(var(--cw) * 0.105));
+            line-height: 1.15;
+            font-weight: 700;
+            text-align: center;
+            padding-bottom: 0.3em;
+            border-bottom: 1px solid var(--line-strong);
+        }
+
+        .card-sigil {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: calc(var(--cw) * 0.28);
+            opacity: 0.5;
+        }
+
+        .card-foot {
+            display: flex;
+            justify-content: flex-start;
+        }
+
+        .slot-empty {
+            width: 100%;
+            height: 100%;
+            border: 2px dashed var(--line);
+            border-radius: 0.5rem;
+            opacity: 0.3;
+        }
+
+        /* Animations */
+        @keyframes flyIn {
+            0% { opacity: 0; transform: translate(0, var(--fly-from, 50px)) scale(0.8) rotateX(45deg); }
+            100% { opacity: 1; transform: none; }
+        }
+
+        .animate-deal {
+            animation: flyIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+            animation-delay: var(--deal-delay, 0ms);
+        }
+
+        #opponent-slots { --fly-from: -50px; }
+
+        @keyframes spectralFlame {
+            0% { transform: scale(1); box-shadow: 0 0 0 rgba(34, 197, 94, 0); filter: brightness(1); }
+            20% { transform: scale(1.15) rotate(-3deg); box-shadow: 0 0 40px rgba(34, 197, 94, 0.8); filter: brightness(1.5); }
+            40% { transform: scale(1.15) rotate(3deg); box-shadow: 0 0 60px rgba(34, 197, 94, 1); filter: brightness(2); }
+            60% { transform: scale(1.15) rotate(-3deg); box-shadow: 0 0 60px rgba(34, 197, 94, 1); filter: brightness(2); }
+            100% { transform: scale(1); box-shadow: 0 0 0 rgba(34, 197, 94, 0); filter: brightness(1); }
+        }
+
+        .anim-spectral {
+            animation: spectralFlame 1s ease-out forwards;
+        }
+
+        @keyframes darkVoid {
+            0% { transform: scale(1); filter: contrast(1); }
+            30% { transform: scale(0.8) rotate(10deg); filter: contrast(2) invert(0.2); box-shadow: inset 0 0 50px var(--void), 0 0 40px var(--void); }
+            60% { transform: scale(0.1) rotate(-20deg); opacity: 1; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        .anim-void {
+            animation: darkVoid 0.8s ease-in forwards;
+        }
+
+        @keyframes bump {
+            0% { transform: scale(1); }
+            40% { transform: scale(1.35); }
+            100% { transform: scale(1); }
+        }
+
+        .badge-bump {
+            animation: bump 0.35s ease-out;
+        }
+
+        /* Targeting Mode */
+        body.targeting {
+            cursor: crosshair;
+        }
+        body.targeting .card-wrapper {
+            cursor: crosshair;
+        }
+        body.targeting .card-wrapper:hover .card-fx,
+        body.targeting .card-wrapper:focus-visible .card-fx {
+            scale: 1.05;
+        }
+        body.targeting #player-slots .card-wrapper:hover,
+        body.targeting #player-slots .card-wrapper:focus-visible {
+            filter: drop-shadow(0 0 10px var(--ally));
+        }
+        body.targeting #opponent-slots .card-wrapper:hover,
+        body.targeting #opponent-slots .card-wrapper:focus-visible {
+            filter: drop-shadow(0 0 10px var(--enemy));
+        }
+
+        .card-wrapper:focus-visible {
+            outline: 2px solid var(--fg);
+            outline-offset: 4px;
+        }
+
+        /* UI Elements */
+        .glass-panel {
+            background: var(--panel);
+            -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--line);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+        }
+
+        .btn-gothic {
+            background: linear-gradient(180deg, #2d2d3a 0%, var(--bg-glow) 100%);
+            border: 1px solid var(--line-strong);
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        @media (min-width: 640px) {
+            .btn-gothic { letter-spacing: 2px; }
+        }
+        .btn-gothic:hover:not(:disabled) {
+            background: linear-gradient(180deg, #3f3f52 0%, #2d2d3a 100%);
+            border-color: #6b7280;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+        }
+        .btn-gothic:focus-visible {
+            outline: 2px solid var(--muted);
+            outline-offset: 2px;
+        }
+        .btn-gothic:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Badges */
+        .badge-qty {
+            position: absolute;
+            bottom: calc(var(--cw) * -0.077);
+            right: calc(var(--cw) * -0.077);
+            background: #000;
+            border: 2px solid #fff;
+            color: #fff;
+            border-radius: 50%;
+            width: max(22px, calc(var(--cw) * 0.246));
+            height: max(22px, calc(var(--cw) * 0.246));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: max(10px, calc(var(--cw) * 0.11));
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.02em;
+            z-index: 10;
+        }
+
+        .badge-pts {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid;
+            padding: 0.1em 0.45em;
+            border-radius: 4px;
+            font-size: max(8px, calc(var(--cw) * 0.092));
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        #toast {
+            max-width: calc(100vw - 32px);
+            text-align: center;
+            top: calc(1.25rem + env(safe-area-inset-top, 0px));
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .card, .card-wrapper, .card-fx { transition-duration: 0.01ms !important; }
+            .animate-deal, .anim-spectral, .anim-void, .badge-bump {
+                animation-duration: 0.01ms !important;
+                animation-delay: 0ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+<main class="crypt-table">
+
+    <!-- Opponent Board (Top) -->
+    <section class="w-full max-w-5xl flex flex-col items-center gap-3 sm:gap-4" aria-label="Opponent board">
+        <div class="flex flex-wrap justify-between w-full px-2 sm:px-8 items-end gap-2">
+            <h2 class="text-lg sm:text-2xl text-red-500 font-bold tracking-widest drop-shadow-md">Opponent (AI)</h2>
+            <div class="text-base sm:text-xl glass-panel px-3 sm:px-4 py-1 sm:py-2 rounded">Strength: <span id="opp-strength" class="font-bold tabular-nums">???</span></div>
+        </div>
+        <div id="opponent-slots" class="flex gap-2 sm:gap-4 p-2 sm:p-4 glass-panel rounded-xl w-full justify-center">
+            <!-- Opponent Cards Injected Here -->
+        </div>
+    </section>
+
+    <!-- Middle Belt (Controls & Decks) -->
+    <section class="w-full max-w-5xl flex flex-wrap justify-center sm:justify-between items-center gap-4 glass-panel p-3 sm:p-4 rounded-xl z-20 relative border-y border-gray-700" aria-label="Wagers and actions">
+        <div class="flex items-center gap-4">
+            <div class="text-center">
+                <div class="text-xs sm:text-sm text-gray-400">Current Round</div>
+                <div id="round-display" class="text-2xl sm:text-3xl font-bold text-white tabular-nums">1 / 3</div>
+                <div class="text-xs text-gray-500"><span id="deck-display" class="tabular-nums">59</span> in the crypt</div>
+            </div>
+            <div class="w-px h-14 bg-gray-600"></div>
+            <div class="flex flex-col gap-1">
+                <label for="bet-input" class="sr-only">Bet amount in gold</label>
+                <input type="number" id="bet-input" min="0" step="1" inputmode="numeric" placeholder="Bet Amount" class="bg-gray-900 border border-gray-700 rounded px-3 py-1 text-white w-32 focus:outline-none focus:border-gray-500">
+                <div class="text-sm text-yellow-500">Total Pot: <span id="pot-display" class="font-bold text-lg tabular-nums">0</span></div>
+                <div class="text-sm text-gray-300">Gold: <span id="gold-display" class="font-bold tabular-nums">1000</span></div>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap justify-center gap-2 sm:gap-4">
+            <button id="btn-draw" class="btn-gothic px-4 py-2 sm:px-6 sm:py-3 text-sm sm:text-base rounded text-white font-bold">Draw Army</button>
+            <button id="btn-spell" class="btn-gothic px-4 py-2 sm:px-6 sm:py-3 text-sm sm:text-base rounded text-green-400 font-bold border-green-900" disabled>Cast Spell (1)</button>
+            <button id="btn-resolve" class="btn-gothic px-4 py-2 sm:px-6 sm:py-3 text-sm sm:text-base rounded text-red-400 font-bold border-red-900" disabled>Resolve Round</button>
+        </div>
+    </section>
+
+    <!-- Player Board (Bottom) -->
+    <section class="w-full max-w-5xl flex flex-col items-center gap-3 sm:gap-4" aria-label="Your board">
+        <div id="player-slots" class="flex gap-2 sm:gap-4 p-2 sm:p-4 glass-panel rounded-xl w-full justify-center">
+            <!-- Player Cards Injected Here -->
+        </div>
+        <div class="flex flex-wrap justify-between w-full px-2 sm:px-8 items-start gap-2">
+            <h2 class="text-lg sm:text-2xl text-blue-400 font-bold tracking-widest drop-shadow-md">Your Army</h2>
+            <div class="text-base sm:text-xl glass-panel px-3 sm:px-4 py-1 sm:py-2 rounded">Strength: <span id="player-strength" class="font-bold tabular-nums">0</span></div>
+        </div>
+        <p class="text-xs sm:text-sm text-gray-400 text-center max-w-2xl px-2 leading-relaxed" style="text-wrap: balance;">
+            Bet, then draw five undead. Each round you get one spell:
+            <span class="text-green-400">Animate Dead</span> doubles one of your stacks,
+            <span class="text-purple-400">Implosion</span> destroys an enemy stack.
+            After three rounds the stronger army wins double the pot.
+        </p>
+    </section>
+
+</main>
+
+    <!-- Toast Notification -->
+    <div id="toast" role="status" aria-live="polite" class="fixed left-1/2 transform -translate-x-1/2 glass-panel border-gray-500 text-white px-6 py-3 rounded text-base sm:text-lg opacity-0 pointer-events-none transition-opacity duration-300 z-50">
+        Notification
+    </div>
+
+    <script>
+        // --- GAME DATA & CONFIG ---
+        const UNIT_DATA = [
+            { name: 'Skeleton', pts: 1, color: '#9ca3af', count: 20 },      // Gray
+            { name: 'Zombie', pts: 2, color: '#4ade80', count: 12 },        // Green
+            { name: 'Wight', pts: 3, color: '#60a5fa', count: 9 },          // Blue
+            { name: 'Vampire', pts: 4, color: '#c084fc', count: 8 },        // Purple
+            { name: 'Lich', pts: 7, color: '#fb923c', count: 6 },           // Orange
+            { name: 'Dark Knight', pts: 25, color: '#ef4444', count: 3 },   // Red
+            { name: 'Bone Dragon', pts: 60, color: '#facc15', count: 1 }    // Gold
+        ];
+
+        const SLOT_COUNT = 5;
+        const TOTAL_ROUNDS = 3;
+        const STARTING_GOLD = 1000;
+        const DEFAULT_BET = 100;
+        const GOLD_KEY = 'necropolis-casino-gold';
+
+        let deck = [];
+        let playerArmy = [];
+        let opponentArmy = [];
+
+        let currentRound = 1;
+        let totalPot = 0;
+        let phase = 'BETTING'; // BETTING, ACTION, RESOLVED
+        let fogOfWar = true;
+        let spellAvailable = false;
+        let isTargeting = false;
+        let busy = false; // true while a spell animation plays
+        let gold = loadGold();
+
+        // --- DOM ELEMENTS ---
+        const els = {
+            oppSlots: document.getElementById('opponent-slots'),
+            playerSlots: document.getElementById('player-slots'),
+            oppStrength: document.getElementById('opp-strength'),
+            playerStrength: document.getElementById('player-strength'),
+            btnDraw: document.getElementById('btn-draw'),
+            btnSpell: document.getElementById('btn-spell'),
+            btnResolve: document.getElementById('btn-resolve'),
+            roundDisp: document.getElementById('round-display'),
+            potDisp: document.getElementById('pot-display'),
+            goldDisp: document.getElementById('gold-display'),
+            deckDisp: document.getElementById('deck-display'),
+            betInput: document.getElementById('bet-input'),
+            toast: document.getElementById('toast'),
+            body: document.body
+        };
+
+        // --- STORAGE (gold survives a page reload; works without it too) ---
+        function loadGold() {
+            try {
+                const saved = parseInt(localStorage.getItem(GOLD_KEY), 10);
+                return Number.isFinite(saved) && saved > 0 ? saved : STARTING_GOLD;
+            } catch (e) {
+                return STARTING_GOLD;
+            }
+        }
+
+        function saveGold() {
+            try {
+                localStorage.setItem(GOLD_KEY, String(gold));
+            } catch (e) {
+                // Storage blocked: gold just won't persist across reloads
+            }
+        }
+
+        // --- CORE LOGIC ---
+        function initGame() {
+            buildDeck();
+            currentRound = 1;
+            totalPot = 0;
+            playerArmy = [];
+            opponentArmy = [];
+            phase = 'BETTING';
+            fogOfWar = true;
+            spellAvailable = false;
+            busy = false;
+            setTargeting(false);
+
+            if (gold <= 0) {
+                gold = STARTING_GOLD;
+                saveGold();
+                showToast(`Your purse is empty. The Necropolis lends you ${STARTING_GOLD} gold.`);
+            } else {
+                showToast("Welcome to the Necropolis. Place your bet to begin.");
+            }
+            els.betInput.value = Math.min(DEFAULT_BET, gold);
+            updateUI();
+        }
+
+        function buildDeck() {
+            deck = [];
+            UNIT_DATA.forEach(unit => {
+                for (let i = 0; i < unit.count; i++) {
+                    deck.push({ ...unit, id: Math.random().toString(36).slice(2, 11) });
+                }
+            });
+            // Shuffle
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+        }
+
+        let toastTimer = null;
+        function showToast(msg, duration = 3000) {
+            clearTimeout(toastTimer);
+            els.toast.textContent = msg;
+            els.toast.style.opacity = '1';
+            toastTimer = setTimeout(() => { els.toast.style.opacity = '0'; }, duration);
+        }
+
+        function getArmyStrength(army) {
+            return army.reduce((total, stack) => total + (stack.pts * stack.qty), 0);
+        }
+
+        function wait(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // --- ACTIONS ---
+        els.btnDraw.addEventListener('click', () => {
+            if (phase !== 'BETTING' || busy) return;
+
+            // Round 1 needs a stake; later rounds may raise or check with 0
+            const raw = els.betInput.value.trim();
+            const bet = raw === '' && currentRound > 1 ? 0 : Number(raw);
+            if (!Number.isInteger(bet) || bet < 0 || (currentRound === 1 && bet === 0)) {
+                showToast(currentRound === 1
+                    ? "Place a bet of at least 1 gold to begin."
+                    : "Enter a whole number of gold, or 0 to check.");
+                return;
+            }
+            if (bet > gold) {
+                showToast(`You only have ${gold} gold.`);
+                return;
+            }
+
+            gold -= bet;
+            saveGold();
+            totalPot += bet;
+            els.betInput.value = '';
+            phase = 'ACTION';
+            fogOfWar = true;
+            spellAvailable = true;
+
+            drawCardsForArmy(playerArmy, 5);
+            drawCardsForArmy(opponentArmy, 5);
+
+            updateUI();
+            showToast("Armies Drawn! Cast a spell or Resolve.");
+        });
+
+        els.betInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') els.btnDraw.click();
+        });
+
+        function drawCardsForArmy(army, count) {
+            let placed = 0;
+            while (placed < count && deck.length > 0) {
+                const card = deck.pop();
+
+                const existing = army.find(c => c.name === card.name && c.qty > 0);
+                if (existing) {
+                    existing.qty += 1;
+                    placed++;
+                    continue;
+                }
+
+                const freeIndex = findFreeSlot(army);
+                if (freeIndex === -1) {
+                    // Discard if slots full and not a duplicate (doesn't count against the draws)
+                    continue;
+                }
+
+                // Generate random placement values for the tabletop feel
+                card.qty = 1;
+                card.rot = (Math.random() * 12) - 6; // -6deg to +6deg
+                card.tx = (Math.random() * 10) - 5;  // -5px to +5px
+                card.ty = (Math.random() * 10) - 5;  // -5px to +5px
+                army[freeIndex] = card;
+                placed++;
+            }
+        }
+
+        // A destroyed stack frees its slot for new recruits
+        function findFreeSlot(army) {
+            for (let i = 0; i < SLOT_COUNT; i++) {
+                if (!army[i] || army[i].qty === 0) return i;
+            }
+            return -1;
+        }
+
+        // --- SPELL SYSTEM (PLAYER) ---
+        function spellLabel() {
+            return isTargeting ? "Cancel Target" : `Cast Spell (${spellAvailable ? 1 : 0})`;
+        }
+
+        function setTargeting(on) {
+            isTargeting = on;
+            els.body.classList.toggle('targeting', on);
+            els.btnSpell.textContent = spellLabel();
+        }
+
+        els.btnSpell.addEventListener('click', () => {
+            if (!spellAvailable || phase !== 'ACTION' || busy) return;
+            setTargeting(!isTargeting);
+            if (isTargeting) showToast("Target an ally to Double, or an enemy to Destroy.");
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && isTargeting) setTargeting(false);
+        });
+
+        async function handleCardClick(isOpponent, index) {
+            if (!isTargeting || !spellAvailable || phase !== 'ACTION' || busy) return;
+
+            const targetArmy = isOpponent ? opponentArmy : playerArmy;
+            const targetStack = targetArmy[index];
+            if (!targetStack || targetStack.qty === 0) return;
+
+            spellAvailable = false;
+            busy = true;
+            setTargeting(false);
+            updateUI();
+
+            if (isOpponent) {
+                // Implosion
+                targetStack.qty = 0;
+                showToast("Implosion Cast! Enemy stack destroyed.");
+                await playSpell(`opp-card-${index}`, 'anim-void');
+            } else {
+                // Animate Dead
+                targetStack.qty *= 2;
+                showToast("Animate Dead Cast! Ally stack doubled.");
+                updateUI();
+                await playSpell(`player-card-${index}`, 'anim-spectral');
+            }
+
+            busy = false;
+            updateUI();
+        }
+
+        // Plays a spell animation and resolves when it finishes
+        function playSpell(elementId, animClass) {
+            return new Promise(resolve => {
+                const el = document.getElementById(elementId);
+                if (!el) {
+                    resolve();
+                    return;
+                }
+                let done = false;
+                const finish = () => {
+                    if (done) return;
+                    done = true;
+                    el.removeEventListener('animationend', onEnd);
+                    // A voided card stays collapsed until the board re-renders without it
+                    if (animClass !== 'anim-void') el.classList.remove(animClass);
+                    resolve();
+                };
+                const onEnd = (e) => { if (e.target === el) finish(); };
+
+                el.classList.remove('animate-deal');
+                void el.offsetWidth; // Restart animation cleanly
+                el.classList.add(animClass);
+                el.addEventListener('animationend', onEnd);
+                setTimeout(finish, 1500); // Safety net if animationend never fires
+            });
+        }
+
+        // --- RESOLVE & AI ---
+        els.btnResolve.addEventListener('click', async () => {
+            if (phase !== 'ACTION' || busy) return;
+            phase = 'RESOLVED';
+            setTargeting(false);
+
+            // 1. Lift Fog of War (opponent cards flip face up)
+            fogOfWar = false;
+            updateUI();
+
+            // 2. Delay slightly for dramatic effect, then AI casts spell
+            await wait(800);
+            await aiTurn();
+            updateUI();
+
+            // 3. Evaluate Round / Game Over
+            await wait(1500);
+            if (currentRound >= TOTAL_ROUNDS) {
+                finalizeGame();
+                return;
+            }
+            currentRound++;
+            phase = 'BETTING';
+            fogOfWar = true; // Fog returns next round
+            updateUI();
+            showToast(`Round ${currentRound} begins. Raise your bet or enter 0 to check.`);
+        });
+
+        async function aiTurn() {
+            // AI Logic: Find best target
+            let bestPlayerStack = { qty: 0, pts: 0, index: -1 };
+            playerArmy.forEach((c, i) => {
+                if (c.qty * c.pts > bestPlayerStack.qty * bestPlayerStack.pts) {
+                    bestPlayerStack = { ...c, index: i };
+                }
+            });
+
+            let bestAiStack = { qty: 0, pts: 0, index: -1 };
+            opponentArmy.forEach((c, i) => {
+                if (c.qty * c.pts > bestAiStack.qty * bestAiStack.pts) {
+                    bestAiStack = { ...c, index: i };
+                }
+            });
+
+            // Compare potential point deltas
+            const destroyValue = bestPlayerStack.qty * bestPlayerStack.pts;
+            const doubleValue = bestAiStack.qty * bestAiStack.pts; // Doubling adds exactly its current value
+
+            if (destroyValue > doubleValue && bestPlayerStack.index !== -1) {
+                playerArmy[bestPlayerStack.index].qty = 0;
+                showToast("Opponent casts Implosion on your forces!", 2000);
+                await playSpell(`player-card-${bestPlayerStack.index}`, 'anim-void');
+            } else if (bestAiStack.index !== -1) {
+                opponentArmy[bestAiStack.index].qty *= 2;
+                showToast("Opponent casts Animate Dead!", 2000);
+                updateUI();
+                await playSpell(`opp-card-${bestAiStack.index}`, 'anim-spectral');
+            }
+        }
+
+        function finalizeGame() {
+            const pStrength = getArmyStrength(playerArmy);
+            const oStrength = getArmyStrength(opponentArmy);
+
+            if (pStrength > oStrength) {
+                gold += totalPot * 2;
+                showToast(`VICTORY! You won ${totalPot * 2} Gold!`, 5000);
+            } else if (oStrength > pStrength) {
+                showToast("DEFEAT. The Necropolis claims your soul and your gold.", 5000);
+            } else {
+                gold += totalPot;
+                showToast("DRAW. The dead rest easy. Your bets are returned.", 5000);
+            }
+            saveGold();
+            updateUI();
+
+            // Reset Game after 5 seconds
+            setTimeout(initGame, 5000);
+        }
+
+        // --- RENDER ---
+        function updateUI() {
+            els.roundDisp.textContent = `${currentRound} / ${TOTAL_ROUNDS}`;
+            els.potDisp.textContent = totalPot;
+            els.goldDisp.textContent = gold;
+            els.deckDisp.textContent = deck.length;
+
+            // Buttons state
+            els.btnDraw.disabled = (phase !== 'BETTING' || busy);
+            els.btnSpell.disabled = (!spellAvailable || phase !== 'ACTION' || busy);
+            els.btnSpell.textContent = spellLabel();
+            els.btnResolve.disabled = (phase !== 'ACTION' || busy);
+            els.betInput.disabled = (phase !== 'BETTING' || busy);
+            els.betInput.placeholder = currentRound === 1 ? 'Bet Amount' : '0 to check';
+
+            // Strengths
+            els.playerStrength.textContent = getArmyStrength(playerArmy);
+            els.oppStrength.textContent = fogOfWar ? '???' : getArmyStrength(opponentArmy);
+
+            // Render Boards
+            renderArmy(playerArmy, els.playerSlots, false);
+            renderArmy(opponentArmy, els.oppSlots, true);
+        }
+
+        // Updates the board in place so flips, spell effects and quantity changes animate
+        // instead of every card being rebuilt (and re-dealt) on each update
+        function renderArmy(army, container, isOpponent) {
+            if (container.children.length !== SLOT_COUNT) {
+                container.innerHTML = '';
+                // Always render 5 physical slots
+                for (let i = 0; i < SLOT_COUNT; i++) {
+                    const slot = document.createElement('div');
+                    slot.className = 'card-slot';
+                    slot.addEventListener('click', () => handleCardClick(isOpponent, i));
+                    slot.addEventListener('keydown', (e) => {
+                        if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('card-wrapper')) {
+                            e.preventDefault();
+                            handleCardClick(isOpponent, i);
+                        }
+                    });
+                    container.appendChild(slot);
+                }
+            }
+
+            let newCards = 0;
+            for (let i = 0; i < SLOT_COUNT; i++) {
+                const slot = container.children[i];
+                const stack = army[i];
+                const alive = Boolean(stack && stack.qty > 0);
+                const key = alive ? stack.id : '';
+
+                if (slot.dataset.key !== key) {
+                    slot.dataset.key = key;
+                    // New cards deal in one after another; empty slots show a dashed outline
+                    slot.innerHTML = alive
+                        ? buildCardHTML(stack, i, isOpponent, newCards++ * 90)
+                        : '<div class="slot-empty"></div>';
+                }
+                if (!alive) continue;
+
+                // Apply Fog of War ONLY to opponent
+                const hidden = isOpponent && fogOfWar;
+                slot.querySelector('.card').classList.toggle('face-down', hidden);
+                slot.querySelector('.card-wrapper').setAttribute('aria-label', hidden
+                    ? 'Hidden enemy stack'
+                    : `${isOpponent ? 'Enemy' : 'Your'} ${stack.name} x${stack.qty}, ${stack.pts} pts each`);
+
+                const badge = slot.querySelector('.badge-qty');
+                const qtyText = `x${stack.qty}`;
+                if (badge.textContent !== qtyText) {
+                    badge.textContent = qtyText;
+                    badge.classList.remove('badge-bump');
+                    void badge.offsetWidth;
+                    badge.classList.add('badge-bump');
+                }
+            }
+        }
+
+        function buildCardHTML(stack, index, isOpponent, dealDelay) {
+            const isFacedown = isOpponent && fogOfWar;
+            const prefix = isOpponent ? 'opp' : 'player';
+
+            // Random positioning applied to the wrapper inside the slot
+            const transformStyle = `transform: translate(${stack.tx}px, ${stack.ty}px) rotate(${stack.rot}deg);`;
+
+            // Distinct Color styling
+            const frontStyle = `border-color: ${stack.color}; box-shadow: 0 0 15px ${stack.color}40;`;
+            const textStyle = `color: ${stack.color}; text-shadow: 0 0 5px ${stack.color};`;
+
+            return `
+                <div class="card-wrapper" style="${transformStyle}" tabindex="0" role="button">
+                    <div id="${prefix}-card-${index}" class="card-fx animate-deal" style="--deal-delay: ${dealDelay}ms;">
+                        <div class="card ${isFacedown ? 'face-down' : ''}">
+                            <div class="card-face card-front" style="${frontStyle}">
+                                <div class="card-name" style="${textStyle}">${stack.name}</div>
+                                <div class="card-sigil" style="${textStyle}">☠</div>
+                                <div class="card-foot">
+                                    <span class="badge-pts" style="border-color: ${stack.color}; color: ${stack.color};">${stack.pts} pts</span>
+                                </div>
+                                <div class="badge-qty" style="border-color: ${stack.color};">x${stack.qty}</div>
+                            </div>
+                            <div class="card-face card-back"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- RUN ---
+        // Keeps a hand in progress when the page is hot-reloaded in the Claude artifact viewer (no-op elsewhere)
+        window.claude?.hot?.snapshot?.(() => (phase === 'RESOLVED' || busy) ? null : {
+            deck, playerArmy, opponentArmy, currentRound, totalPot, phase, fogOfWar, spellAvailable
+        });
+
+        function start(saved) {
+            if (saved && Array.isArray(saved.deck)) {
+                ({ deck, playerArmy, opponentArmy, currentRound, totalPot, phase, fogOfWar, spellAvailable } = saved);
+                setTargeting(false);
+                updateUI();
+            } else {
+                initGame();
+            }
+        }
+
+        window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+    </script>
+</body>
+</html>
