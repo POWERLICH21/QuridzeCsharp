@@ -109,6 +109,7 @@
         }
 
         .card-front {
+            isolation: isolate;
             border: 2px solid;
             background: linear-gradient(180deg, var(--card-ink-hi) 0%, var(--card-ink) 100%);
         }
@@ -128,12 +129,15 @@
         }
 
         .card-name {
+            position: relative;
+            z-index: 2;
             font-size: max(8px, calc(var(--cw) * 0.105));
             line-height: 1.15;
             font-weight: 700;
             text-align: center;
             padding-bottom: 0.3em;
             border-bottom: 1px solid var(--line-strong);
+            text-shadow: 0 0 5px currentColor;
         }
 
         .card-sigil {
@@ -143,11 +147,43 @@
             justify-content: center;
             font-size: calc(var(--cw) * 0.28);
             opacity: 0.5;
+            text-shadow: 0 0 5px currentColor;
         }
 
         .card-foot {
+            position: relative;
+            z-index: 2;
             display: flex;
             justify-content: flex-start;
+        }
+
+        /* Creature art: full-bleed picture, shaded at the top and bottom so the name and badges stay readable */
+        .card-art {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: calc(0.5rem - 2px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .card-front.has-art::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: calc(0.5rem - 2px);
+            background: linear-gradient(180deg,
+                rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0) 24%,
+                rgba(0, 0, 0, 0) 76%, rgba(0, 0, 0, 0.55) 100%);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .card-front.has-art .card-name {
+            border-bottom-color: rgba(156, 163, 175, 0.35);
+            text-shadow: 0 1px 3px #000, 0 0 6px currentColor;
         }
 
         .slot-empty {
@@ -372,15 +408,26 @@
 
     <script>
         // --- GAME DATA & CONFIG ---
+        // art: card picture in img/ (<art>.webp, and <art>-empowered.webp shown after Animate Dead)
         const UNIT_DATA = [
-            { name: 'Skeleton', pts: 1, color: '#9ca3af', count: 20 },      // Gray
-            { name: 'Zombie', pts: 2, color: '#4ade80', count: 12 },        // Green
-            { name: 'Wight', pts: 3, color: '#60a5fa', count: 9 },          // Blue
-            { name: 'Vampire', pts: 4, color: '#c084fc', count: 8 },        // Purple
-            { name: 'Lich', pts: 7, color: '#fb923c', count: 6 },           // Orange
-            { name: 'Dark Knight', pts: 25, color: '#ef4444', count: 3 },   // Red
-            { name: 'Bone Dragon', pts: 60, color: '#facc15', count: 1 }    // Gold
+            { name: 'Skeleton', pts: 1, color: '#9ca3af', count: 20 },                          // Gray
+            { name: 'Zombie', pts: 2, color: '#4ade80', count: 12, art: 'zombie' },             // Green
+            { name: 'Wight', pts: 3, color: '#60a5fa', count: 9, art: 'wight' },                // Blue
+            { name: 'Vampire', pts: 4, color: '#c084fc', count: 8, art: 'vampire' },            // Purple
+            { name: 'Lich', pts: 7, color: '#fb923c', count: 6 },                               // Orange
+            { name: 'Dark Knight', pts: 25, color: '#ef4444', count: 3, art: 'dark-knight' },   // Red
+            { name: 'Bone Dragon', pts: 60, color: '#facc15', count: 1, art: 'bone-dragon' }    // Gold
         ];
+
+        function artSrc(unit, empowered) {
+            return `img/${unit.art}${empowered ? '-empowered' : ''}.webp`;
+        }
+
+        // Warm the image cache so dealt cards and empowered swaps never show up blank
+        UNIT_DATA.filter(unit => unit.art).forEach(unit => {
+            new Image().src = artSrc(unit, false);
+            new Image().src = artSrc(unit, true);
+        });
 
         const SLOT_COUNT = 5;
         const TOTAL_ROUNDS = 3;
@@ -605,9 +652,9 @@
             } else {
                 // Animate Dead
                 targetStack.qty *= 2;
+                targetStack.empowered = true;
                 showToast("Animate Dead Cast! Ally stack doubled.");
-                updateUI();
-                await playSpell(`player-card-${index}`, 'anim-spectral');
+                await empowerWithAnimation(`player-card-${index}`);
             }
 
             busy = false;
@@ -639,6 +686,14 @@
                 el.addEventListener('animationend', onEnd);
                 setTimeout(finish, 1500); // Safety net if animationend never fires
             });
+        }
+
+        // Animate Dead: the new quantity and empowered art appear at the brightest moment of the flame
+        async function empowerWithAnimation(elementId) {
+            const spell = playSpell(elementId, 'anim-spectral');
+            await wait(400);
+            updateUI();
+            await spell;
         }
 
         // --- RESOLVE & AI ---
@@ -695,9 +750,9 @@
                 await playSpell(`player-card-${bestPlayerStack.index}`, 'anim-void');
             } else if (bestAiStack.index !== -1) {
                 opponentArmy[bestAiStack.index].qty *= 2;
+                opponentArmy[bestAiStack.index].empowered = true;
                 showToast("Opponent casts Animate Dead!", 2000);
-                updateUI();
-                await playSpell(`opp-card-${bestAiStack.index}`, 'anim-spectral');
+                await empowerWithAnimation(`opp-card-${bestAiStack.index}`);
             }
         }
 
@@ -786,7 +841,12 @@
                 slot.querySelector('.card').classList.toggle('face-down', hidden);
                 slot.querySelector('.card-wrapper').setAttribute('aria-label', hidden
                     ? 'Hidden enemy stack'
-                    : `${isOpponent ? 'Enemy' : 'Your'} ${stack.name} x${stack.qty}, ${stack.pts} pts each`);
+                    : `${isOpponent ? 'Enemy' : 'Your'} ${stack.empowered ? 'empowered ' : ''}${stack.name} x${stack.qty}, ${stack.pts} pts each`);
+
+                const art = slot.querySelector('.card-art');
+                if (art && art.getAttribute('src') !== artSrc(stack, stack.empowered)) {
+                    art.setAttribute('src', artSrc(stack, stack.empowered));
+                }
 
                 const badge = slot.querySelector('.badge-qty');
                 const qtyText = `x${stack.qty}`;
@@ -808,15 +868,21 @@
 
             // Distinct Color styling
             const frontStyle = `border-color: ${stack.color}; box-shadow: 0 0 15px ${stack.color}40;`;
-            const textStyle = `color: ${stack.color}; text-shadow: 0 0 5px ${stack.color};`;
+            const textStyle = `color: ${stack.color};`;
+
+            // Creature art fills the card; units without art keep the skull sigil
+            const artHtml = stack.art
+                ? `<img class="card-art" src="${artSrc(stack, stack.empowered)}" alt="" draggable="false">`
+                : '';
 
             return `
                 <div class="card-wrapper" style="${transformStyle}" tabindex="0" role="button">
                     <div id="${prefix}-card-${index}" class="card-fx animate-deal" style="--deal-delay: ${dealDelay}ms;">
                         <div class="card ${isFacedown ? 'face-down' : ''}">
-                            <div class="card-face card-front" style="${frontStyle}">
+                            <div class="card-face card-front ${stack.art ? 'has-art' : ''}" style="${frontStyle}">
+                                ${artHtml}
                                 <div class="card-name" style="${textStyle}">${stack.name}</div>
-                                <div class="card-sigil" style="${textStyle}">☠</div>
+                                <div class="card-sigil" style="${textStyle}">${stack.art ? '' : '☠'}</div>
                                 <div class="card-foot">
                                     <span class="badge-pts" style="border-color: ${stack.color}; color: ${stack.color};">${stack.pts} pts</span>
                                 </div>
