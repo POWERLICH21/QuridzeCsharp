@@ -396,7 +396,7 @@
         </div>
         <p class="text-xs sm:text-sm text-gray-400 text-center max-w-2xl px-2 leading-relaxed" style="text-wrap: balance;">
             Bet, then draw five undead. Each round you get one spell:
-            <span class="text-green-400">Animate Dead</span> doubles one of your stacks,
+            <span class="text-green-400">Animate Dead</span> doubles one of your stacks and upgrades it,
             <span class="text-purple-400">Implosion</span> destroys an enemy stack.
             After three rounds the stronger army wins double the pot.
         </p>
@@ -432,15 +432,17 @@
 
     <script>
         // --- GAME DATA & CONFIG ---
-        // art: card picture (img/<art>.png is the weaker base unit; img/<art>-empowered.png appears only after Animate Dead)
+        // One entry per creature level. count: copies in the deck; pts: power per creature.
+        // Each level's total power (count x pts) rises from 20 to 60.
+        // art: card picture (img/<art>.png is the weaker base unit; img/<art>-empowered.png is the upgrade from Animate Dead)
         const UNIT_DATA = [
-            { name: 'Skeleton', pts: 1, color: '#9ca3af', count: 20, art: 'skeleton' },         // Gray
-            { name: 'Zombie', pts: 2, color: '#4ade80', count: 12, art: 'zombie' },             // Green
-            { name: 'Wight', pts: 3, color: '#60a5fa', count: 9, art: 'wight' },                // Blue
-            { name: 'Vampire', pts: 4, color: '#c084fc', count: 8, art: 'vampire' },            // Purple
-            { name: 'Lich', pts: 7, color: '#fb923c', count: 6, art: 'lich' },                  // Orange
-            { name: 'Dark Knight', pts: 25, color: '#ef4444', count: 3, art: 'dark-knight' },   // Red
-            { name: 'Bone Dragon', pts: 60, color: '#facc15', count: 1, art: 'bone-dragon' }    // Gold
+            { name: 'Skeleton', pts: 1, color: '#9ca3af', count: 20, art: 'skeleton' },         // Level 1, Gray: 20 total
+            { name: 'Zombie', pts: 2, color: '#4ade80', count: 12, art: 'zombie' },             // Level 2, Green: 24 total
+            { name: 'Wight', pts: 3, color: '#60a5fa', count: 9, art: 'wight' },                // Level 3, Blue: 27 total
+            { name: 'Vampire', pts: 4, color: '#c084fc', count: 8, art: 'vampire' },            // Level 4, Purple: 32 total
+            { name: 'Lich', pts: 7, color: '#fb923c', count: 6, art: 'lich' },                  // Level 5, Orange: 42 total
+            { name: 'Dark Knight', pts: 17, color: '#ef4444', count: 3, art: 'dark-knight' },   // Level 6, Red: 51 total
+            { name: 'Bone Dragon', pts: 60, color: '#facc15', count: 1, art: 'bone-dragon' }    // Level 7, Gold: 60 total
         ];
 
         function artSrc(unit, empowered) {
@@ -679,7 +681,7 @@
                 // Animate Dead
                 targetStack.qty *= 2;
                 targetStack.empowered = true;
-                showToast("Animate Dead Cast! Ally stack doubled.");
+                showToast("Animate Dead Cast! Ally stack doubled and upgraded.");
                 await empowerWithAnimation(`player-card-${index}`);
             }
 
@@ -777,7 +779,7 @@
             } else if (bestAiStack.index !== -1) {
                 opponentArmy[bestAiStack.index].qty *= 2;
                 opponentArmy[bestAiStack.index].empowered = true;
-                showToast("Opponent casts Animate Dead!", 2000);
+                showToast("Opponent casts Animate Dead! Their stack is doubled and upgraded.", 2000);
                 await empowerWithAnimation(`opp-card-${bestAiStack.index}`);
             }
         }
