@@ -329,7 +329,7 @@ body.covered { overflow: hidden; }
 <div class="app">
   <header class="masthead">
     <h1>Fog of War Chess</h1>
-    <p>Play White against Claude, or pass the screen to a friend. You only see one square around each of your pieces. There is no check: capture the king to win.</p>
+    <p>Play White against Claude, or pass the screen to a friend. You see one square around each of your pieces, and every square you uncover stays open. There is no check: capture the king to win.</p>
   </header>
 
   <main class="table">
@@ -392,7 +392,7 @@ body.covered { overflow: hidden; }
         <ul>
           <li>Against Claude you play White. Claude only gets Black's view: the squares Black can see, Black's moves, and what Black learned from yours.</li>
           <li>Against a friend, the board is covered between turns. Pass the screen and let the other player reveal it.</li>
-          <li>You see the squares next to your pieces, one step in every direction. Everything else is fog.</li>
+          <li>You see the squares next to your pieces, one step in every direction. Once you have seen a square it stays open for the rest of the game, showing whatever is on it now. Everything else is fog.</li>
           <li>There is no check or checkmate. Capturing the enemy king wins, so guard yours.</li>
           <li>You may move into the fog. A rook, bishop or queen that runs into a hidden enemy stops there and captures it.</li>
           <li>A pawn's two-square first move stops after one square if a hidden piece is in the way.</li>
@@ -415,7 +415,8 @@ body.covered { overflow: hidden; }
 </div>
 
 <script id="rules">
-// Chess with fog of war. Each side sees only the squares within one step of its own pieces.
+// Chess with fog of war. Each side sees the squares within one step of its own pieces, and a square
+// it has seen once stays open for the rest of the game.
 // No check or checkmate: capturing the king wins. Moves are offered from what the mover can see
 // and then played out on the real board, so pieces can be stopped by enemies hidden in the fog.
 const WHITE = "w", BLACK = "b";
@@ -438,6 +439,8 @@ class Game {
   constructor(saved) {
     if (saved) {
       Object.assign(this, saved);
+      // Games saved before squares stayed open start from what each side sees now.
+      this.explored ??= { w: this.nearby(WHITE), b: this.nearby(BLACK) };
       return;
     }
     this.board = Array(64).fill(null);
@@ -455,12 +458,19 @@ class Game {
     this.winner = null;
     this.draw = false;
     this.endReason = null;
+    this.explored = { w: this.nearby(WHITE), b: this.nearby(BLACK) };
   }
 
   get over() { return this.winner !== null || this.draw; }
   get lastMove() { return this.history.length ? this.history[this.history.length - 1] : null; }
 
+  // Every square a side has ever seen: once opened, the fog never comes back.
   visibility(color) {
+    return [...this.explored[color]];
+  }
+
+  // Squares within one step of a side's pieces right now.
+  nearby(color) {
     const visible = Array(64).fill(false);
     for (let sq = 0; sq < 64; sq++) {
       if (this.board[sq]?.c !== color) continue;
@@ -561,6 +571,7 @@ class Game {
 
     this.moveCount++;
     this.side = opponent(mover);
+    this.openAroundPieces();
     // What the other player will see when their turn starts.
     const seenByOpponent = this.visibility(this.side);
     const result = {
@@ -591,6 +602,13 @@ class Game {
       if (this.board[sq]?.c === color) this.addMoves(sq, this.board[sq], visible, moves);
     }
     return moves.length > 0;
+  }
+
+  openAroundPieces() {
+    for (const color of [WHITE, BLACK]) {
+      const near = this.nearby(color);
+      this.explored[color] = this.explored[color].map((seen, sq) => seen || near[sq]);
+    }
   }
 
   movePiece(from, to) {
@@ -795,7 +813,7 @@ function claudePrompt(game) {
   return `You are playing ${COLOR_NAMES[me]} in a game of Fog of War Chess against a person playing ${COLOR_NAMES[them]}. Choose your next move.
 
 Rules of this variant:
-- You only see squares within one step (including diagonals) of your own pieces. Everything else is fog: it may be empty or hide enemy pieces.
+- You see every square that is, or has ever been, within one step (including diagonals) of one of your pieces; once seen, a square stays visible with its current contents. Everything else is fog: it may be empty or hide enemy pieces.
 - There is no check or checkmate. You win by capturing the enemy king and lose if yours is captured, possibly without warning.
 - You may move into the fog. A rook, bishop or queen sliding through fog stops at the first hidden enemy piece and captures it. A pawn's two-square move stops after one square if a hidden piece blocks the second square. Castling fails, and the turn is lost, if a hidden piece is in the way.
 - Both sides started from the normal chess position. En passant and promotion work as usual.
@@ -881,8 +899,8 @@ function newGame(newMode) {
   viewer = WHITE;
   phase = "playing";
   message = mode === "claude"
-    ? `You play White against ${opponentName()}. You can see one square around each of your pieces; the rest is fog.`
-    : "White moves first. You can see one square around each of your pieces; the rest is fog.";
+    ? `You play White against ${opponentName()}. You see one square around each of your pieces, and squares you uncover stay open.`
+    : "White moves first. You see one square around each of your pieces, and squares you uncover stay open.";
   clearSelection();
   $("confirm").hidden = true;
   save();

@@ -22,6 +22,8 @@ then press F5. From a terminal: `dotnet run --project FogChess`.
 
 - Between turns the board is covered. Pass the screen and let the other player reveal it.
 - You see the squares next to your pieces. Everything else is fog.
+- In the browser version, a square you have seen once stays open for the rest of the game
+  (for both sides). The Windows version still fogs squares again when your pieces move away.
 - There is no check or checkmate. Capturing the enemy king wins.
 - You may move into the fog. A rook, bishop or queen that runs into a hidden enemy stops there and captures it.
 - A pawn's two-square first move stops after one square if a hidden piece is in the way.
