@@ -6,6 +6,8 @@
     <RootNamespace>QuridzeC_</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- The chess game is its own project; keep its files out of this one. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);FogChess/**</DefaultItemExcludes>
   </PropertyGroup>
 
 </Project>

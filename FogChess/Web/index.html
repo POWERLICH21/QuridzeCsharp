@@ -1,0 +1,1007 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fog of War Chess</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&family=IM+Fell+English+SC&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols+2&text=%E2%99%94%E2%99%95%E2%99%96%E2%99%97%E2%99%98%E2%99%99%E2%99%9A%E2%99%9B%E2%99%9C%E2%99%9D%E2%99%9E%E2%99%9F&display=block">
+<style>
+/* Layout: board first. The square board fills the left column and a narrow ledger (turn, report, notation, captures) sits on the right; they stack on phones.
+   One deliberate look: a lantern-lit board on a foggy night, so the page stays dark in both host themes. */
+:root {
+  color-scheme: dark;
+  --night: #121a21;
+  --night-2: #19232c;
+  --line: #2b3945;
+  --parchment: #ebe3d0;
+  --mist: #93a3ad;
+  --lantern: #e8a945;
+  --lantern-ink: #241806;
+  --wood-light: #e4cb98;
+  --wood-dark: #a7764a;
+  --frame: #2a2019;
+  --fog: #3a4854;
+  --fog-deep: #323f4a;
+  --ivory: #fbf6ea;
+  --ebony: #1b1814;
+  --ebony-edge: #cdbf9f;
+  --tint-last: rgba(222, 200, 92, 0.42);
+  --tint-selected: rgba(232, 169, 69, 0.55);
+  --hint-dark: rgba(30, 20, 10, 0.38);
+  --hint-light: rgba(235, 227, 208, 0.5);
+  --scrim: rgba(10, 14, 18, 0.74);
+
+  --font-display: "IM Fell English SC", "Iowan Old Style", Georgia, serif;
+  --font-body: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --font-pieces: "Noto Sans Symbols 2", "Segoe UI Symbol", "Apple Symbols", "DejaVu Sans", serif;
+
+  --fog-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.011' numOctaves='3' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.86 0 0 0 0 0.9 0 0 0 0 0.95 0.95 0 0 0 -0.33'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--night);
+  color: var(--parchment);
+  font: 400 1.0625rem/1.5 var(--font-body);
+}
+body.covered { overflow: hidden; }
+:focus-visible { outline: 3px solid var(--lantern); outline-offset: 2px; }
+
+.app {
+  max-width: 1160px;
+  margin-inline: auto;
+  padding-inline: 16px;
+  padding-block: 20px 40px;
+  display: grid;
+  gap: 18px;
+}
+
+.masthead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 20px; }
+.masthead h1 {
+  margin: 0;
+  font: 400 clamp(2rem, 4.4vw, 2.9rem)/1.05 var(--font-display);
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+}
+.masthead p { margin: 0; color: var(--mist); max-width: 62ch; }
+
+.table {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 320px);
+  gap: 28px;
+  align-items: start;
+}
+
+/* ---------- Board ---------- */
+.board-wrap {
+  position: relative;
+  justify-self: center;
+  width: min(100%, max(320px, calc(100dvh - 150px)));
+}
+.frame {
+  padding: 1.6%;
+  background: var(--frame);
+  border-radius: 6px;
+  box-shadow: 0 22px 44px -20px rgba(0, 0, 0, 0.75);
+}
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  aspect-ratio: 1;
+  container-type: inline-size;
+  overflow: hidden;
+  border-radius: 2px;
+}
+.sq {
+  appearance: none;
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background-color: var(--wood-light);
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+.sq.dark { background-color: var(--wood-dark); }
+.sq:focus-visible { outline-offset: -3px; z-index: 1; }
+.sq.fog {
+  background-color: var(--fog);
+  background-image: var(--fog-texture);
+  background-attachment: fixed;
+  animation: drift 90s linear infinite;
+}
+.sq.fog.dark { background-color: var(--fog-deep); }
+.sq.last { background-image: linear-gradient(var(--tint-last), var(--tint-last)); }
+.sq.selected {
+  background-image: linear-gradient(var(--tint-selected), var(--tint-selected));
+  box-shadow: inset 0 0 0 0.45cqi var(--lantern);
+}
+.sq.own, .sq.hint { cursor: pointer; }
+.sq.own:hover { filter: brightness(1.07); }
+.sq.hint::after {
+  content: "";
+  position: absolute;
+  width: 30%;
+  height: 30%;
+  border-radius: 50%;
+  background: var(--hint-dark);
+  pointer-events: none;
+}
+.sq.fog.hint::after { background: var(--hint-light); }
+.sq.hint.capture::after {
+  width: 84%;
+  height: 84%;
+  background: transparent;
+  border: 0.75cqi solid var(--hint-dark);
+}
+.sq.hint:hover::after { transform: scale(1.12); }
+
+.piece {
+  font-family: var(--font-pieces);
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+  -webkit-text-stroke: 0.035em var(--ebony);
+  paint-order: stroke fill;
+  filter: drop-shadow(0 0.04em 0.03em rgba(0, 0, 0, 0.45));
+}
+.piece.w { color: var(--ivory); }
+.piece.b { color: var(--ebony); -webkit-text-stroke: 0.03em var(--ebony-edge); }
+.sq .piece { font-size: 9.8cqi; transform: translateY(-0.3cqi); }
+
+.coord { position: absolute; font: 600 2.1cqi/1 var(--font-mono); pointer-events: none; }
+.coord.file { right: 0.6cqi; bottom: 0.5cqi; }
+.coord.rank { left: 0.6cqi; top: 0.5cqi; }
+.sq .coord { color: var(--wood-dark); }
+.sq.dark .coord { color: var(--wood-light); }
+.sq.fog .coord { color: var(--mist); }
+
+.banner {
+  position: absolute;
+  left: 50%;
+  top: 5%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 90%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px 12px 10px 18px;
+  background: rgba(15, 21, 27, 0.93);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.8);
+  text-align: center;
+}
+.banner.center { top: 50%; transform: translate(-50%, -50%); padding: 16px 20px; }
+.banner-text { font-weight: 500; }
+.banner.center .banner-text { font: 400 clamp(1.3rem, 3.4vw, 1.9rem)/1.15 var(--font-display); }
+
+.promo {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--scrim);
+  border-radius: 6px;
+}
+.promo-card {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 16px 18px 18px;
+  background: var(--night-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.promo-card h2 { margin: 0; font: 400 1.4rem/1.1 var(--font-display); }
+.promo-choices { display: flex; gap: 10px; }
+.promo-choices button {
+  display: grid;
+  place-items: center;
+  width: clamp(54px, 13vw, 84px);
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 10px;
+  background: var(--wood-light);
+  cursor: pointer;
+}
+.promo-choices button:hover { background: var(--wood-dark); }
+.promo-choices .piece { font-size: clamp(34px, 8.5vw, 58px); }
+
+/* ---------- Ledger ---------- */
+.ledger { display: grid; gap: 18px; min-width: 0; }
+.turn { display: flex; align-items: center; gap: 12px; }
+.turn .piece { font-size: 2.6rem; }
+.turn strong { display: block; font: 400 1.6rem/1.1 var(--font-display); }
+.eyebrow, .ledger h2 {
+  margin: 0;
+  font: 600 0.74rem/1.3 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mist);
+}
+.ledger h2 { margin-bottom: 8px; }
+.panel {
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--night-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.report { min-height: 4.6em; }
+.log {
+  display: grid;
+  grid-template-columns: 2.4em minmax(0, 1fr) minmax(0, 1fr);
+  gap: 3px 10px;
+  max-height: 15.5rem;
+  overflow-y: auto;
+  font: 400 0.9rem/1.45 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.log .n, .log .unseen, .log .empty { color: var(--mist); }
+.log .empty { grid-column: 1 / -1; font-family: var(--font-body); }
+.log .mv { overflow-wrap: anywhere; }
+.tag {
+  margin-left: 6px;
+  font: 700 0.66rem/1 var(--font-body);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lantern);
+}
+.captures { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; align-items: center; }
+.captures .label { color: var(--mist); }
+.captures .set { font-size: 1.55rem; line-height: 1.1; min-height: 1.1em; overflow-wrap: anywhere; }
+.captures .set .piece { font-size: inherit; }
+.captures .none { font-size: 1rem; color: var(--mist); }
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.confirm { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+
+.btn {
+  font: 700 0.98rem/1 var(--font-body);
+  padding: 0.72em 1.1em;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--parchment);
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--mist); }
+.btn.primary { background: var(--lantern); border-color: var(--lantern); color: var(--lantern-ink); }
+.btn.primary:hover { filter: brightness(1.07); }
+
+.rules summary { cursor: pointer; font-weight: 700; }
+.rules ul { margin: 10px 0 0; padding-left: 1.1em; display: grid; gap: 6px; color: var(--parchment); }
+.rules li::marker { color: var(--lantern); }
+
+/* ---------- Pass-the-screen cover ---------- */
+.handoff {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background-color: var(--night);
+  background-image: var(--fog-texture);
+  animation: drift 120s linear infinite;
+}
+.handoff-card { display: grid; justify-items: center; gap: 14px; max-width: 32rem; text-align: center; }
+.handoff-card .piece { font-size: clamp(5rem, 18vw, 8rem); }
+.handoff-card h2 { margin: 0; font: 400 clamp(2.2rem, 7vw, 3.4rem)/1.05 var(--font-display); }
+.handoff-card p { margin: 0; color: var(--mist); }
+.handoff-card .btn { margin-top: 6px; font-size: 1.05rem; }
+
+@keyframes drift {
+  from { background-position: 0 0; }
+  to { background-position: 640px 320px; }
+}
+
+@media (max-width: 840px) {
+  .table { grid-template-columns: minmax(0, 1fr); }
+  .board-wrap { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sq.fog, .handoff { animation: none; }
+  .sq.hint:hover::after { transform: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="masthead">
+    <h1>Fog of War Chess</h1>
+    <p>Two players, one screen. You only see one square around each of your pieces. There is no check: capture the king to win.</p>
+  </header>
+
+  <main class="table">
+    <section class="board-wrap" aria-label="Board">
+      <div class="frame">
+        <div class="board" id="board"></div>
+      </div>
+      <div class="banner" id="banner" hidden>
+        <span class="banner-text" id="bannerText"></span>
+        <button type="button" class="btn primary" id="endTurn">End turn</button>
+      </div>
+      <div class="promo" id="promo" hidden>
+        <div class="promo-card" role="dialog" aria-labelledby="promoTitle">
+          <h2 id="promoTitle">Promote your pawn</h2>
+          <div class="promo-choices" id="promoChoices"></div>
+          <button type="button" class="btn" id="promoCancel">Cancel</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="ledger">
+      <div class="turn">
+        <span class="piece w" id="turnKing">♚</span>
+        <div>
+          <span class="eyebrow" id="turnEyebrow">Move 1</span>
+          <strong id="turnTitle">White to move</strong>
+        </div>
+      </div>
+
+      <p class="panel report" id="report" aria-live="polite"></p>
+
+      <section>
+        <h2>Notation</h2>
+        <div class="panel log" id="log"></div>
+      </section>
+
+      <section>
+        <h2>Captures</h2>
+        <div class="panel captures">
+          <span class="label">You took</span><span class="set" id="taken"></span>
+          <span class="label">You lost</span><span class="set" id="lost"></span>
+        </div>
+      </section>
+
+      <div class="actions">
+        <button type="button" class="btn" id="newGame">New game</button>
+        <div class="confirm" id="confirm" hidden>
+          <span>Abandon this game?</span>
+          <button type="button" class="btn primary" id="confirmYes">Start over</button>
+          <button type="button" class="btn" id="confirmNo">Keep playing</button>
+        </div>
+      </div>
+
+      <details class="rules">
+        <summary>Rules</summary>
+        <ul>
+          <li>Between turns the board is covered. Pass the screen and let the other player reveal it.</li>
+          <li>You see the squares next to your pieces, one step in every direction. Everything else is fog.</li>
+          <li>There is no check or checkmate. Capturing the enemy king wins, so guard yours.</li>
+          <li>You may move into the fog. A rook, bishop or queen that runs into a hidden enemy stops there and captures it.</li>
+          <li>A pawn's two-square first move stops after one square if a hidden piece is in the way.</li>
+          <li>Castling fails, and costs you the turn, if a hidden piece stands between king and rook.</li>
+          <li>En passant and promotion work as usual.</li>
+          <li>Notation is long algebraic. ▒▒ marks a square you could not see.</li>
+        </ul>
+      </details>
+    </aside>
+  </main>
+</div>
+
+<div class="handoff" id="handoff" hidden>
+  <div class="handoff-card">
+    <span class="piece w" id="handoffKing">♚</span>
+    <h2 id="handoffTitle">White to move</h2>
+    <p id="handoffText"></p>
+    <button type="button" class="btn primary" id="reveal">Show White's board</button>
+  </div>
+</div>
+
+<script id="rules">
+// Chess with fog of war. Each side sees only the squares within one step of its own pieces.
+// No check or checkmate: capturing the king wins. Moves are offered from what the mover can see
+// and then played out on the real board, so pieces can be stopped by enemies hidden in the fog.
+const WHITE = "w", BLACK = "b";
+const KNIGHT_JUMPS = [[1, 2], [2, 1], [2, -1], [1, -2], [-1, -2], [-2, -1], [-2, 1], [-1, 2]];
+const STRAIGHT = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const DIAGONAL = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+const ALL_DIRECTIONS = [...STRAIGHT, ...DIAGONAL];
+const BACK_RANK = ["R", "N", "B", "Q", "K", "B", "N", "R"];
+const PIECE_NAMES = { P: "pawn", N: "knight", B: "bishop", R: "rook", Q: "queen", K: "king" };
+const COLOR_NAMES = { w: "White", b: "Black" };
+
+const opponent = (color) => (color === WHITE ? BLACK : WHITE);
+const square = (file, rank) => rank * 8 + file;
+const fileOf = (sq) => sq % 8;
+const rankOf = (sq) => sq >> 3;
+const onBoard = (file, rank) => file >= 0 && file < 8 && rank >= 0 && rank < 8;
+const squareName = (sq) => "abcdefgh"[fileOf(sq)] + (rankOf(sq) + 1);
+
+class Game {
+  constructor(saved) {
+    if (saved) {
+      Object.assign(this, saved);
+      return;
+    }
+    this.board = Array(64).fill(null);
+    for (let file = 0; file < 8; file++) {
+      this.board[square(file, 0)] = { t: BACK_RANK[file], c: WHITE };
+      this.board[square(file, 1)] = { t: "P", c: WHITE };
+      this.board[square(file, 6)] = { t: "P", c: BLACK };
+      this.board[square(file, 7)] = { t: BACK_RANK[file], c: BLACK };
+    }
+    this.side = WHITE;
+    this.castling = { w: [true, true], b: [true, true] }; // [kingside, queenside]
+    this.enPassant = null; // square a pawn skipped over on the previous move
+    this.moveCount = 0;
+    this.history = [];
+    this.winner = null;
+    this.draw = false;
+    this.endReason = null;
+  }
+
+  get over() { return this.winner !== null || this.draw; }
+  get lastMove() { return this.history.length ? this.history[this.history.length - 1] : null; }
+
+  visibility(color) {
+    const visible = Array(64).fill(false);
+    for (let sq = 0; sq < 64; sq++) {
+      if (this.board[sq]?.c !== color) continue;
+      for (let df = -1; df <= 1; df++) {
+        for (let dr = -1; dr <= 1; dr++) {
+          const f = fileOf(sq) + df, r = rankOf(sq) + dr;
+          if (onBoard(f, r)) visible[square(f, r)] = true;
+        }
+      }
+    }
+    return visible;
+  }
+
+  movesFrom(from) {
+    const piece = this.board[from];
+    if (this.over || !piece || piece.c !== this.side) return [];
+    const moves = [];
+    this.addMoves(from, piece, this.visibility(this.side), moves);
+    return moves;
+  }
+
+  isPromotion(move) {
+    return this.board[move.from]?.t === "P" && (rankOf(move.to) === 0 || rankOf(move.to) === 7);
+  }
+
+  makeMove(move) {
+    if (this.over) throw new Error("The game is over.");
+    if (move.promotion && !"QRBN".includes(move.promotion)) throw new Error("Bad promotion piece.");
+    if (!this.movesFrom(move.from).some((m) => m.to === move.to)) {
+      throw new Error(`${squareName(move.from)}-${squareName(move.to)} is not a legal move.`);
+    }
+
+    const piece = this.board[move.from];
+    const mover = piece.c;
+    const visibleBefore = this.visibility(mover);
+    const enPassantBefore = this.enPassant;
+    this.enPassant = null;
+
+    const from = move.from;
+    const fromFile = fileOf(from), fromRank = rankOf(from);
+    let to = move.to;
+    let capturedOn = null;
+    let interrupted = false, blocked = false, castled = false, enPassant = false;
+
+    if (piece.t === "K" && Math.abs(fileOf(to) - fromFile) === 2) {
+      const kingSide = fileOf(to) > fromFile;
+      const rookFile = kingSide ? 7 : 0;
+      for (let f = Math.min(fromFile, rookFile) + 1; f < Math.max(fromFile, rookFile); f++) {
+        if (this.board[square(f, fromRank)]) blocked = true;
+      }
+      if (blocked) {
+        to = from;
+      } else {
+        castled = true;
+        this.movePiece(square(rookFile, fromRank), square(kingSide ? 5 : 3, fromRank));
+      }
+    } else if ("BRQ".includes(piece.t)) {
+      // Own pieces are always visible, so anything found on the path is a hidden enemy.
+      const df = Math.sign(fileOf(to) - fromFile), dr = Math.sign(rankOf(to) - fromRank);
+      for (let sq = square(fromFile + df, fromRank + dr); sq !== to; sq = square(fileOf(sq) + df, rankOf(sq) + dr)) {
+        if (this.board[sq]) {
+          to = sq;
+          interrupted = true;
+          break;
+        }
+      }
+    } else if (piece.t === "P" && Math.abs(rankOf(to) - fromRank) === 2) {
+      const skipped = square(fromFile, (fromRank + rankOf(to)) / 2);
+      if (this.board[to]) {
+        to = skipped;
+        interrupted = true;
+      } else {
+        this.enPassant = skipped;
+      }
+    } else if (piece.t === "P" && fileOf(to) !== fromFile && to === enPassantBefore) {
+      enPassant = true;
+      capturedOn = square(fileOf(to), fromRank);
+    }
+
+    if (!enPassant && to !== from && this.board[to]) capturedOn = to;
+
+    let captured = null;
+    if (capturedOn !== null) {
+      captured = this.board[capturedOn];
+      this.board[capturedOn] = null;
+    }
+
+    let promotedTo = null;
+    if (to !== from) {
+      this.movePiece(from, to);
+      if (piece.t === "P" && (rankOf(to) === 0 || rankOf(to) === 7)) {
+        promotedTo = move.promotion || "Q";
+        this.board[to] = { t: promotedTo, c: mover };
+      }
+      this.clearCastling(from);
+      this.clearCastling(to);
+    }
+
+    this.moveCount++;
+    this.side = opponent(mover);
+    // What the other player will see when their turn starts.
+    const seenByOpponent = this.visibility(this.side);
+    const result = {
+      mover, piece: piece.t, from, requestedTo: move.to, to, captured, capturedOn,
+      captureWasHidden: capturedOn !== null && !visibleBefore[capturedOn],
+      interrupted, blocked, castled, enPassant, promotedTo,
+      opponentSaw: { from: seenByOpponent[from], to: seenByOpponent[to] },
+    };
+    this.history.push(result);
+
+    if (captured?.t === "K") {
+      this.winner = mover;
+      this.endReason = `${COLOR_NAMES[mover]} wins by capturing the ${COLOR_NAMES[opponent(mover)].toLowerCase()} king!`;
+    } else if (this.board.every((p) => !p || p.t === "K")) {
+      this.draw = true;
+      this.endReason = "Draw: only the two kings are left.";
+    } else if (!this.hasAnyMove(this.side)) {
+      this.draw = true;
+      this.endReason = `Draw: ${COLOR_NAMES[this.side]} has no moves.`;
+    }
+    return result;
+  }
+
+  hasAnyMove(color) {
+    const visible = this.visibility(color);
+    const moves = [];
+    for (let sq = 0; sq < 64 && moves.length === 0; sq++) {
+      if (this.board[sq]?.c === color) this.addMoves(sq, this.board[sq], visible, moves);
+    }
+    return moves.length > 0;
+  }
+
+  movePiece(from, to) {
+    this.board[to] = this.board[from];
+    this.board[from] = null;
+  }
+
+  // Anything moving from or to a king or rook home square ends that castling option.
+  clearCastling(sq) {
+    for (const color of [WHITE, BLACK]) {
+      if (rankOf(sq) !== (color === WHITE ? 0 : 7)) continue;
+      if (fileOf(sq) === 4 || fileOf(sq) === 7) this.castling[color][0] = false;
+      if (fileOf(sq) === 4 || fileOf(sq) === 0) this.castling[color][1] = false;
+    }
+  }
+
+  // What the mover believes is on a square: fog squares look empty.
+  seenAt(sq, visible) { return visible[sq] ? this.board[sq] : null; }
+
+  addMoves(from, piece, visible, out) {
+    switch (piece.t) {
+      case "P": this.addPawnMoves(from, piece.c, visible, out); break;
+      case "N": this.addSteps(from, piece.c, KNIGHT_JUMPS, visible, out); break;
+      case "B": this.addSlides(from, piece.c, DIAGONAL, visible, out); break;
+      case "R": this.addSlides(from, piece.c, STRAIGHT, visible, out); break;
+      case "Q": this.addSlides(from, piece.c, ALL_DIRECTIONS, visible, out); break;
+      case "K":
+        this.addSteps(from, piece.c, ALL_DIRECTIONS, visible, out);
+        this.addCastling(from, piece.c, visible, out);
+        break;
+    }
+  }
+
+  addSteps(from, color, steps, visible, out) {
+    for (const [df, dr] of steps) {
+      const f = fileOf(from) + df, r = rankOf(from) + dr;
+      if (onBoard(f, r) && this.seenAt(square(f, r), visible)?.c !== color) out.push({ from, to: square(f, r) });
+    }
+  }
+
+  addSlides(from, color, directions, visible, out) {
+    for (const [df, dr] of directions) {
+      for (let f = fileOf(from) + df, r = rankOf(from) + dr; onBoard(f, r); f += df, r += dr) {
+        const seen = this.seenAt(square(f, r), visible);
+        if (seen?.c === color) break;
+        out.push({ from, to: square(f, r) });
+        if (seen) break;
+      }
+    }
+  }
+
+  addPawnMoves(from, color, visible, out) {
+    const f = fileOf(from), r = rankOf(from);
+    const forward = color === WHITE ? 1 : -1;
+    const startRank = color === WHITE ? 1 : 6;
+    if (onBoard(f, r + forward) && !this.seenAt(square(f, r + forward), visible)) {
+      out.push({ from, to: square(f, r + forward) });
+      if (r === startRank && !this.seenAt(square(f, r + 2 * forward), visible)) {
+        out.push({ from, to: square(f, r + 2 * forward) });
+      }
+    }
+    for (const side of [-1, 1]) {
+      if (!onBoard(f + side, r + forward)) continue;
+      const target = square(f + side, r + forward);
+      const seen = this.seenAt(target, visible);
+      if ((seen && seen.c !== color) || (!seen && target === this.enPassant)) out.push({ from, to: target });
+    }
+  }
+
+  // No check in this variant: castling only needs an unmoved king and rook and squares between that look empty.
+  addCastling(from, color, visible, out) {
+    const rank = color === WHITE ? 0 : 7;
+    if (from !== square(4, rank)) return;
+    const canCastle = (side, rookFile, firstFile, lastFile) => {
+      const rook = this.board[square(rookFile, rank)];
+      if (!this.castling[color][side] || rook?.t !== "R" || rook.c !== color) return false;
+      for (let f = firstFile; f <= lastFile; f++) {
+        if (this.seenAt(square(f, rank), visible)) return false;
+      }
+      return true;
+    };
+    if (canCastle(0, 7, 5, 6)) out.push({ from, to: square(6, rank) });
+    if (canCastle(1, 0, 1, 3)) out.push({ from, to: square(2, rank) });
+  }
+}
+
+function describeForMover(r) {
+  if (r.blocked) return "Castling failed: an unseen piece is standing between your king and rook. You lose this turn.";
+  const name = PIECE_NAMES[r.piece];
+  let text;
+  if (r.castled) text = fileOf(r.to) === 6 ? "You castled kingside." : "You castled queenside.";
+  else if (r.interrupted && r.captured) text = `Your ${name} ran into a hidden ${PIECE_NAMES[r.captured.t]} on ${squareName(r.to)} and captured it!`;
+  else if (r.interrupted) text = `Your ${name} was blocked by an unseen piece and stopped on ${squareName(r.to)}.`;
+  else if (r.captured && r.captureWasHidden) text = `Your ${name} moved to ${squareName(r.to)} and captured a hidden ${PIECE_NAMES[r.captured.t]}!`;
+  else if (r.captured) text = `Your ${name} captured the ${PIECE_NAMES[r.captured.t]} on ${squareName(r.capturedOn)}${r.enPassant ? " en passant" : ""}.`;
+  else text = `Your ${name} moved ${squareName(r.from)} → ${squareName(r.to)}.`;
+  if (r.promotedTo) text += ` It was promoted to a ${PIECE_NAMES[r.promotedTo]}!`;
+  return text;
+}
+
+// Only mentions what the other player can actually see.
+function describeForOpponent(r) {
+  const who = COLOR_NAMES[r.mover];
+  let text;
+  if (!r.blocked && r.opponentSaw.to) {
+    text = r.castled ? `${who} castled.` : `${who}'s ${PIECE_NAMES[r.piece]} moved to ${squareName(r.to)}`
+      + (r.promotedTo ? ` and became a ${PIECE_NAMES[r.promotedTo]}.` : ".");
+  } else if (!r.blocked && r.opponentSaw.from) {
+    text = `${who}'s ${PIECE_NAMES[r.piece]} left ${squareName(r.from)} and disappeared into the fog.`;
+  } else {
+    text = `${who} made a move you could not see.`;
+  }
+  if (r.captured) text += ` Your ${PIECE_NAMES[r.captured.t]} on ${squareName(r.capturedOn)} was captured!`;
+  return text;
+}
+
+// Long algebraic notation of what really happened.
+function notation(r) {
+  if (r.castled || r.blocked) return fileOf(r.requestedTo) === 6 ? "O-O" : "O-O-O";
+  const letter = r.piece === "P" ? "" : r.piece;
+  return letter + squareName(r.from) + (r.captured ? "x" : "-") + squareName(r.to) + (r.promotedTo ? "=" + r.promotedTo : "");
+}
+
+// The same move as the other player saw it; ▒▒ stands for a square in the fog.
+function notationSeenByOpponent(r) {
+  const sawFrom = !r.blocked && r.opponentSaw.from, sawTo = !r.blocked && r.opponentSaw.to;
+  if (r.castled && (sawFrom || sawTo)) return fileOf(r.to) === 6 ? "O-O" : "O-O-O";
+  if (!sawFrom && !sawTo) return r.captured ? `▒▒x${squareName(r.capturedOn)}` : "▒▒▒▒▒";
+  const letter = r.piece === "P" ? "" : r.piece;
+  const target = sawTo ? squareName(r.to) : r.captured ? squareName(r.capturedOn) : "▒▒";
+  return letter + (sawFrom ? squareName(r.from) : "▒▒") + (r.captured ? "x" : "-") + target
+    + (sawTo && r.promotedTo ? "=" + r.promotedTo : "");
+}
+</script>
+
+<script>
+const GLYPHS = { K: "♚", Q: "♛", R: "♜", B: "♝", N: "♞", P: "♟" };
+const STORAGE_KEY = "fog-of-war-chess-v1";
+const $ = (id) => document.getElementById(id);
+
+// Phases: "handoff" (board covered between turns), "playing", "promotion", "done" (move made, mover looks), "over".
+let game, phase, viewer, message;
+let selected = null, selectedMoves = [], pendingPromotion = null;
+
+const squares = [];
+for (let i = 0; i < 64; i++) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "sq";
+  button.addEventListener("click", () => onSquare(Number(button.dataset.sq)));
+  $("board").append(button);
+  squares.push(button);
+}
+
+for (const type of ["Q", "R", "B", "N"]) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.dataset.type = type;
+  button.setAttribute("aria-label", PIECE_NAMES[type]);
+  button.addEventListener("click", () => {
+    const move = pendingPromotion;
+    if (move) play({ ...move, promotion: type });
+  });
+  $("promoChoices").append(button);
+}
+
+function pieceHtml(piece) {
+  return `<span class="piece ${piece.c}">${GLYPHS[piece.t]}</span>`;
+}
+
+// ---------- Turn flow ----------
+
+function newGame() {
+  game = new Game();
+  viewer = WHITE;
+  phase = "playing";
+  message = "White moves first. You can see one square around each of your pieces; the rest is fog.";
+  clearSelection();
+  $("confirm").hidden = true;
+  save();
+  render();
+}
+
+function startTurn() {
+  phase = "playing";
+  viewer = game.side;
+  message = game.lastMove ? `${describeForOpponent(game.lastMove)} Your move.` : `${COLOR_NAMES[viewer]}, your move.`;
+  save();
+  render();
+}
+
+function play(move) {
+  const result = game.makeMove(move);
+  clearSelection();
+  if (game.over) {
+    phase = "over";
+    message = `${describeForMover(result)} ${game.endReason}`;
+  } else {
+    phase = "done";
+    message = describeForMover(result);
+  }
+  save();
+  render();
+  if (phase === "done") $("endTurn").focus();
+}
+
+function endTurn() {
+  phase = "handoff";
+  message = "";
+  save();
+  render();
+  $("reveal").focus();
+}
+
+function clearSelection() {
+  selected = null;
+  selectedMoves = [];
+  pendingPromotion = null;
+}
+
+function onSquare(sq) {
+  if (phase !== "playing") return;
+  const move = selectedMoves.find((m) => m.to === sq);
+  if (move) {
+    if (game.isPromotion(move)) {
+      pendingPromotion = move;
+      phase = "promotion";
+      render();
+      $("promoChoices").firstElementChild.focus();
+    } else {
+      play(move);
+    }
+    return;
+  }
+  // Your own pieces are always visible, so checking the real board here gives nothing away.
+  if (game.board[sq]?.c === viewer && sq !== selected) {
+    selected = sq;
+    selectedMoves = game.movesFrom(sq);
+  } else {
+    clearSelection();
+  }
+  render();
+}
+
+function cancelPromotion() {
+  pendingPromotion = null;
+  phase = "playing";
+  render();
+}
+
+// ---------- Rendering ----------
+
+function render() {
+  const covered = phase === "handoff";
+  $("handoff").hidden = !covered;
+  document.body.classList.toggle("covered", covered);
+  if (covered) {
+    const next = game.side;
+    $("handoffKing").className = `piece ${next}`;
+    $("handoffTitle").textContent = `${COLOR_NAMES[next]} to move`;
+    $("handoffText").textContent = `${COLOR_NAMES[opponent(next)]}, please look away. ${COLOR_NAMES[next]}, reveal your board when you are ready.`;
+    $("reveal").textContent = `Show ${COLOR_NAMES[next]}'s board`;
+  }
+  // Under the cover, draw nothing private.
+  renderBoard(covered);
+  renderLedger(covered);
+}
+
+function renderBoard(covered) {
+  const visible = phase === "over" ? null : game.visibility(viewer);
+  const last = game.lastMove && !game.lastMove.blocked ? [game.lastMove.from, game.lastMove.to] : [];
+  const targets = new Set(selectedMoves.map((m) => m.to));
+
+  for (let i = 0; i < 64; i++) {
+    const row = i >> 3, col = i % 8;
+    // The player whose view is shown always has their own pieces at the bottom.
+    const sq = viewer === WHITE ? square(col, 7 - row) : square(7 - col, row);
+    const el = squares[i];
+    const seen = !covered && (!visible || visible[sq]);
+    const piece = seen ? game.board[sq] : null;
+    const dark = (fileOf(sq) + rankOf(sq)) % 2 === 0;
+    const isTarget = !covered && targets.has(sq);
+    const classes = ["sq", dark ? "dark" : "light"];
+    if (!seen) classes.push("fog");
+    if (seen && last.includes(sq)) classes.push("last");
+    if (sq === selected) classes.push("selected");
+    if (isTarget) classes.push("hint", piece ? "capture" : "move");
+    if (phase === "playing" && piece?.c === viewer) classes.push("own");
+
+    el.dataset.sq = sq;
+    el.className = classes.join(" ");
+    el.innerHTML = (piece ? pieceHtml(piece) : "")
+      + (row === 7 ? `<span class="coord file">${"abcdefgh"[fileOf(sq)]}</span>` : "")
+      + (col === 0 ? `<span class="coord rank">${rankOf(sq) + 1}</span>` : "");
+    const contents = !seen ? "fog" : piece ? `${COLOR_NAMES[piece.c].toLowerCase()} ${PIECE_NAMES[piece.t]}` : "empty";
+    el.setAttribute("aria-label", `${squareName(sq)}, ${contents}${isTarget ? ", move here" : ""}`);
+  }
+
+  $("banner").hidden = !(phase === "done" || phase === "over");
+  $("banner").classList.toggle("center", phase === "over");
+  $("endTurn").hidden = phase !== "done";
+  if (phase === "done") $("bannerText").textContent = "Move made. Pass the screen when you are done looking.";
+  if (phase === "over") $("bannerText").textContent = game.endReason;
+
+  $("promo").hidden = phase !== "promotion";
+  for (const button of $("promoChoices").children) {
+    button.innerHTML = pieceHtml({ t: button.dataset.type, c: viewer });
+  }
+}
+
+function renderLedger(covered) {
+  const moveNumber = Math.floor(game.moveCount / 2) + 1;
+  if (covered) {
+    $("turnKing").className = `piece ${game.side}`;
+    $("turnEyebrow").textContent = `Move ${moveNumber}`;
+    $("turnTitle").textContent = `${COLOR_NAMES[game.side]} to move`;
+  } else if (phase === "over") {
+    $("turnKing").className = `piece ${game.winner ?? viewer}`;
+    $("turnEyebrow").textContent = "Game over · board revealed";
+    $("turnTitle").textContent = game.winner ? `${COLOR_NAMES[game.winner]} wins` : "Draw";
+  } else {
+    $("turnKing").className = `piece ${viewer}`;
+    $("turnEyebrow").textContent = `Move ${moveNumber} · ${COLOR_NAMES[viewer]}'s view`;
+    $("turnTitle").textContent = phase === "done" ? `${COLOR_NAMES[game.side]} is next` : `${COLOR_NAMES[viewer]} to move`;
+  }
+
+  $("report").textContent = covered ? "The board is covered while the screen changes hands." : message;
+
+  const log = $("log");
+  log.innerHTML = "";
+  if (covered || game.history.length === 0) {
+    log.innerHTML = `<span class="empty">${covered ? "Hidden until the next player reveals the board." : "No moves yet."}</span>`;
+  } else {
+    game.history.forEach((r, i) => {
+      if (i % 2 === 0) log.insertAdjacentHTML("beforeend", `<span class="n">${i / 2 + 1}.</span>`);
+      const full = phase === "over" || r.mover === viewer;
+      const text = full ? notation(r) : notationSeenByOpponent(r);
+      const tag = !full ? "" : r.blocked ? "blocked" : r.interrupted ? "stopped" : r.captureWasHidden ? "blind" : "";
+      const span = document.createElement("span");
+      span.className = "mv" + (text.includes("▒") ? " unseen" : "");
+      span.textContent = text;
+      if (tag) span.insertAdjacentHTML("beforeend", `<span class="tag">${tag}</span>`);
+      log.append(span);
+    });
+    log.scrollTop = log.scrollHeight;
+  }
+
+  const setHtml = (pieces) => pieces.length ? pieces.map(pieceHtml).join("") : `<span class="none">None yet</span>`;
+  const mine = covered ? [] : game.history.filter((r) => r.captured && r.mover === viewer).map((r) => r.captured);
+  const theirs = covered ? [] : game.history.filter((r) => r.captured && r.mover !== viewer).map((r) => r.captured);
+  $("taken").innerHTML = setHtml(mine);
+  $("lost").innerHTML = setHtml(theirs);
+
+  $("newGame").textContent = phase === "over" ? "Play again" : "New game";
+  $("newGame").classList.toggle("primary", phase === "over");
+}
+
+// ---------- Saving (per browser) and live updates ----------
+
+function snapshot() {
+  return { game: JSON.parse(JSON.stringify(game)), phase, viewer, message };
+}
+
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot())); } catch { /* storage unavailable */ }
+}
+
+function restore(saved, keepPhase) {
+  if (!saved?.game || !Array.isArray(saved.game.board) || saved.game.board.length !== 64) return false;
+  game = new Game(saved.game);
+  viewer = saved.viewer === BLACK ? BLACK : WHITE;
+  message = saved.message ?? "";
+  phase = saved.phase;
+  if (!keepPhase && phase !== "over") {
+    // After a reload, cover the board: whoever is looking may not be the player to move.
+    phase = game.moveCount > 0 ? "handoff" : "playing";
+  }
+  if (phase === "promotion") phase = "playing";
+  if (!["handoff", "playing", "done", "over"].includes(phase)) phase = "handoff";
+  return true;
+}
+
+function start(data) {
+  let loaded = restore(data, true);
+  if (!loaded) {
+    try { loaded = restore(JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"), false); } catch { loaded = false; }
+  }
+  if (!loaded) {
+    newGame();
+    return;
+  }
+  clearSelection();
+  render();
+}
+
+// ---------- Controls ----------
+
+$("endTurn").addEventListener("click", endTurn);
+$("reveal").addEventListener("click", startTurn);
+$("promoCancel").addEventListener("click", cancelPromotion);
+$("promo").addEventListener("click", (e) => { if (e.target === $("promo")) cancelPromotion(); });
+$("newGame").addEventListener("click", () => {
+  if (game.moveCount > 0 && !game.over) $("confirm").hidden = false;
+  else newGame();
+});
+$("confirmYes").addEventListener("click", newGame);
+$("confirmNo").addEventListener("click", () => { $("confirm").hidden = true; });
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (phase === "promotion") cancelPromotion();
+  else if (phase === "playing" && selected !== null) { clearSelection(); render(); }
+});
+
+window.claude?.hot?.snapshot?.(snapshot);
+if (window.claude?.hot?.ready) window.claude.hot.ready(start);
+else start(window.claude?.hot?.data ?? {});
+</script>
+</body>
+</html>

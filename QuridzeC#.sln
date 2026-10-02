@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.13.35931.197 d17.13
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuridzeC#", "QuridzeC#\QuridzeC#.csproj", "{AB63079A-ABEE-4472-A37F-CF63A59F08D3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuridzeC#", "QuridzeC#.csproj", "{AB63079A-ABEE-4472-A37F-CF63A59F08D3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FogChess", "FogChess\FogChess.csproj", "{3B1CB087-0366-4D94-BCBB-744690EB3410}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{AB63079A-ABEE-4472-A37F-CF63A59F08D3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AB63079A-ABEE-4472-A37F-CF63A59F08D3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AB63079A-ABEE-4472-A37F-CF63A59F08D3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3B1CB087-0366-4D94-BCBB-744690EB3410}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3B1CB087-0366-4D94-BCBB-744690EB3410}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3B1CB087-0366-4D94-BCBB-744690EB3410}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3B1CB087-0366-4D94-BCBB-744690EB3410}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
