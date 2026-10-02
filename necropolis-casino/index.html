@@ -157,13 +157,14 @@
             justify-content: flex-start;
         }
 
-        /* Creature art: full-bleed picture, shaded at the top and bottom so the name and badges stay readable */
+        /* Creature art: full-bleed pixel-art picture, shaded at the top and bottom so the name and badges stay readable */
         .card-art {
             position: absolute;
             inset: 0;
             width: 100%;
             height: 100%;
             object-fit: cover;
+            image-rendering: pixelated; /* Keep the pixel-art edges crisp at any card size */
             border-radius: calc(0.5rem - 2px);
             pointer-events: none;
             z-index: 0;
@@ -408,7 +409,7 @@
 
     <script>
         // --- GAME DATA & CONFIG ---
-        // art: card picture in img/ (<art>.webp, and <art>-empowered.webp shown after Animate Dead)
+        // art: card picture in img/ (<art>.png is the weaker base unit; <art>-empowered.png appears only after Animate Dead)
         const UNIT_DATA = [
             { name: 'Skeleton', pts: 1, color: '#9ca3af', count: 20, art: 'skeleton' },         // Gray
             { name: 'Zombie', pts: 2, color: '#4ade80', count: 12, art: 'zombie' },             // Green
@@ -420,7 +421,7 @@
         ];
 
         function artSrc(unit, empowered) {
-            return `img/${unit.art}${empowered ? '-empowered' : ''}.webp`;
+            return `img/${unit.art}${empowered ? '-empowered' : ''}.png`;
         }
 
         // Warm the image cache so dealt cards and empowered swaps never show up blank

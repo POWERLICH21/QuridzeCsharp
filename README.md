@@ -57,4 +57,8 @@ A dark-fantasy betting card game in a single HTML file: [`necropolis-casino/inde
 
 **Rules:** bet gold, then draw five undead units. Each round you get one spell: *Animate Dead* doubles one of your stacks, *Implosion* destroys an enemy stack (enemy cards stay face down until you resolve the round). The AI casts its own spell when the round resolves. After three rounds the stronger army wins double the pot. Your gold balance is saved in the browser.
 
-**Card art:** creature pictures live in `necropolis-casino/img/`. Each unit has a base picture and an empowered one, which appears when Animate Dead doubles that stack. The original artwork and the script that crops it into cards (`make_card_art.py`, needs Pillow) are in `necropolis-casino/art-source/`. To change a picture, replace the image in `art-source/`, adjust its crop boxes in the script, and run it again.
+**Card art:** every creature is drawn in one shared pixel-art style (same palette, outline and crypt alcove) so the whole army reads as one Necropolis. A unit shows its weaker base form (`necropolis-casino/img/<unit>.png`); the stronger form (`<unit>-empowered.png`, in a green spectral alcove) appears only after Animate Dead is cast on that stack.
+
+The art is built from the original images in `necropolis-casino/art-source/` in two steps:
+1. `cut_figures.py` cuts each creature out of its source image into `art-source/cutouts/` (needs `pip install "rembg[cpu]"`). The cutouts can be touched up by hand.
+2. `make_card_art.py` turns the cutouts into the pixel-art cards in `img/` (needs Pillow and numpy).
