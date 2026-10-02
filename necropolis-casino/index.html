@@ -153,7 +153,7 @@
             position: relative;
             z-index: 2;
             display: flex;
-            justify-content: flex-start;
+            justify-content: center;
         }
 
         /* Creature art: full-bleed pixel-art picture, shaded at the top and bottom so the name and badges stay readable */
@@ -298,35 +298,56 @@
             cursor: not-allowed;
         }
 
-        /* Badges */
-        .badge-qty {
-            position: absolute;
-            bottom: calc(var(--cw) * -0.077);
-            right: calc(var(--cw) * -0.077);
-            background: #000;
-            border: 2px solid #fff;
-            color: #fff;
-            border-radius: 50%;
-            width: max(22px, calc(var(--cw) * 0.246));
-            height: max(22px, calc(var(--cw) * 0.246));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: max(10px, calc(var(--cw) * 0.11));
+        /* Points plaque: what the card gives; its colour is the creature's level */
+        .card-points {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 0.25em;
+            background: rgba(0, 0, 0, 0.82);
+            border: 1px solid;
+            border-radius: 4px;
+            padding: 0.1em 0.5em;
+            font-size: max(11px, calc(var(--cw) * 0.15));
+            font-weight: 700;
+            line-height: 1.15;
             font-variant-numeric: tabular-nums;
-            letter-spacing: -0.02em;
-            z-index: 10;
+            white-space: nowrap;
+            text-shadow: 0 0 6px currentColor;
+        }
+        .card-points small {
+            font-size: 0.6em;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+        @media (max-width: 480px) {
+            .card-points small { display: none; } /* Phone cards are narrow: the number alone */
         }
 
-        .badge-pts {
-            background: rgba(0, 0, 0, 0.8);
-            border: 1px solid;
-            padding: 0.1em 0.45em;
-            border-radius: 4px;
-            font-size: max(8px, calc(var(--cw) * 0.092));
-            font-weight: bold;
+        /* Colour key under the rules */
+        .level-legend {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.35rem 1rem;
+            margin: 0;
+            padding: 0 0.5rem;
+            list-style: none;
+            font-size: 0.75rem;
+            color: var(--muted);
+        }
+        .level-legend li {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
             white-space: nowrap;
+        }
+        .level-legend b {
+            font-variant-numeric: tabular-nums;
+        }
+        .legend-swatch {
+            width: 0.7rem;
+            height: 0.7rem;
+            border-radius: 2px;
         }
 
         #toast {
@@ -395,11 +416,13 @@
             <div class="text-base sm:text-xl glass-panel px-3 sm:px-4 py-1 sm:py-2 rounded">Strength: <span id="player-strength" class="font-bold tabular-nums">0</span></div>
         </div>
         <p class="text-xs sm:text-sm text-gray-400 text-center max-w-2xl px-2 leading-relaxed" style="text-wrap: balance;">
-            Bet, then draw five undead. Each round you get one spell:
-            <span class="text-green-400">Animate Dead</span> doubles one of your stacks and upgrades it,
-            <span class="text-purple-400">Implosion</span> destroys an enemy stack.
+            Bet, then draw five undead. Each card shows the points it gives, and its colour shows its level.
+            Matching cards join together and add up their points. Each round you get one spell:
+            <span class="text-green-400">Animate Dead</span> doubles one of your cards and upgrades it,
+            <span class="text-purple-400">Implosion</span> destroys an enemy card.
             After three rounds the stronger army wins double the pot.
         </p>
+        <ul id="level-legend" class="level-legend" aria-label="Card colour for each level"></ul>
     </section>
 
 </main>
@@ -432,18 +455,20 @@
 
     <script>
         // --- GAME DATA & CONFIG ---
-        // One entry per creature level. count: copies in the deck; pts: power per creature.
-        // Each level's total power (count x pts) rises from 20 to 60.
+        // One entry per creature level; its colour marks the level on the cards.
+        // A card spawns `spawn` creatures of `power` each, so it gives spawn x power points (20 up to 60).
+        // count: copies of the card in the deck.
         // art: card picture (img/<art>.png is the weaker base unit; img/<art>-empowered.png is the upgrade from Animate Dead)
         const UNIT_DATA = [
-            { name: 'Skeleton', pts: 1, color: '#9ca3af', count: 20, art: 'skeleton' },         // Level 1, Gray: 20 total
-            { name: 'Zombie', pts: 2, color: '#4ade80', count: 12, art: 'zombie' },             // Level 2, Green: 24 total
-            { name: 'Wight', pts: 3, color: '#60a5fa', count: 9, art: 'wight' },                // Level 3, Blue: 27 total
-            { name: 'Vampire', pts: 4, color: '#c084fc', count: 8, art: 'vampire' },            // Level 4, Purple: 32 total
-            { name: 'Lich', pts: 7, color: '#fb923c', count: 6, art: 'lich' },                  // Level 5, Orange: 42 total
-            { name: 'Dark Knight', pts: 17, color: '#ef4444', count: 3, art: 'dark-knight' },   // Level 6, Red: 51 total
-            { name: 'Bone Dragon', pts: 60, color: '#facc15', count: 1, art: 'bone-dragon' }    // Level 7, Gold: 60 total
+            { name: 'Skeleton', level: 1, spawn: 20, power: 1, count: 20, color: '#9ca3af', art: 'skeleton' },       // Gray: 20 pts
+            { name: 'Zombie', level: 2, spawn: 12, power: 2, count: 12, color: '#4ade80', art: 'zombie' },           // Green: 24 pts
+            { name: 'Wight', level: 3, spawn: 9, power: 3, count: 9, color: '#60a5fa', art: 'wight' },               // Blue: 27 pts
+            { name: 'Vampire', level: 4, spawn: 8, power: 4, count: 8, color: '#c084fc', art: 'vampire' },           // Purple: 32 pts
+            { name: 'Lich', level: 5, spawn: 6, power: 7, count: 6, color: '#fb923c', art: 'lich' },                 // Orange: 42 pts
+            { name: 'Dark Knight', level: 6, spawn: 3, power: 17, count: 3, color: '#ef4444', art: 'dark-knight' },  // Red: 51 pts
+            { name: 'Bone Dragon', level: 7, spawn: 1, power: 60, count: 1, color: '#facc15', art: 'bone-dragon' }   // Gold: 60 pts
         ];
+        UNIT_DATA.forEach(unit => { unit.pts = unit.spawn * unit.power; }); // Points one card gives
 
         function artSrc(unit, empowered) {
             // Embedded copy first; falls back to the img/ file if the page hasn't been built
@@ -491,8 +516,14 @@
             deckDisp: document.getElementById('deck-display'),
             betInput: document.getElementById('bet-input'),
             toast: document.getElementById('toast'),
+            legend: document.getElementById('level-legend'),
             body: document.body
         };
+
+        // Colour key: which colour is which level, and the points one card gives
+        els.legend.innerHTML = UNIT_DATA.map(unit =>
+            `<li><span class="legend-swatch" style="background: ${unit.color};"></span>Lv ${unit.level} ${unit.name} <b style="color: ${unit.color};">${unit.pts}</b></li>`
+        ).join('');
 
         // --- STORAGE (gold survives a page reload; works without it too) ---
         function loadGold() {
@@ -558,8 +589,13 @@
             toastTimer = setTimeout(() => { els.toast.style.opacity = '0'; }, duration);
         }
 
+        // Points a card on the table gives: matching cards add up, Animate Dead doubles them
+        function stackPoints(stack) {
+            return stack.pts * stack.qty;
+        }
+
         function getArmyStrength(army) {
-            return army.reduce((total, stack) => total + (stack.pts * stack.qty), 0);
+            return army.reduce((total, stack) => total + stackPoints(stack), 0);
         }
 
         function wait(ms) {
@@ -675,13 +711,13 @@
             if (isOpponent) {
                 // Implosion
                 targetStack.qty = 0;
-                showToast("Implosion Cast! Enemy stack destroyed.");
+                showToast("Implosion Cast! Enemy card destroyed.");
                 await playSpell(`opp-card-${index}`, 'anim-void');
             } else {
                 // Animate Dead
                 targetStack.qty *= 2;
                 targetStack.empowered = true;
-                showToast("Animate Dead Cast! Ally stack doubled and upgraded.");
+                showToast("Animate Dead Cast! Your card's points are doubled and it is upgraded.");
                 await empowerWithAnimation(`player-card-${index}`);
             }
 
@@ -756,21 +792,21 @@
             // AI Logic: Find best target
             let bestPlayerStack = { qty: 0, pts: 0, index: -1 };
             playerArmy.forEach((c, i) => {
-                if (c.qty * c.pts > bestPlayerStack.qty * bestPlayerStack.pts) {
+                if (stackPoints(c) > stackPoints(bestPlayerStack)) {
                     bestPlayerStack = { ...c, index: i };
                 }
             });
 
             let bestAiStack = { qty: 0, pts: 0, index: -1 };
             opponentArmy.forEach((c, i) => {
-                if (c.qty * c.pts > bestAiStack.qty * bestAiStack.pts) {
+                if (stackPoints(c) > stackPoints(bestAiStack)) {
                     bestAiStack = { ...c, index: i };
                 }
             });
 
             // Compare potential point deltas
-            const destroyValue = bestPlayerStack.qty * bestPlayerStack.pts;
-            const doubleValue = bestAiStack.qty * bestAiStack.pts; // Doubling adds exactly its current value
+            const destroyValue = stackPoints(bestPlayerStack);
+            const doubleValue = stackPoints(bestAiStack); // Doubling adds exactly its current value
 
             if (destroyValue > doubleValue && bestPlayerStack.index !== -1) {
                 playerArmy[bestPlayerStack.index].qty = 0;
@@ -779,7 +815,7 @@
             } else if (bestAiStack.index !== -1) {
                 opponentArmy[bestAiStack.index].qty *= 2;
                 opponentArmy[bestAiStack.index].empowered = true;
-                showToast("Opponent casts Animate Dead! Their stack is doubled and upgraded.", 2000);
+                showToast("Opponent casts Animate Dead! Their card's points are doubled and it is upgraded.", 2000);
                 await empowerWithAnimation(`opp-card-${bestAiStack.index}`);
             }
         }
@@ -868,21 +904,23 @@
                 const hidden = isOpponent && fogOfWar;
                 slot.querySelector('.card').classList.toggle('face-down', hidden);
                 slot.querySelector('.card-wrapper').setAttribute('aria-label', hidden
-                    ? 'Hidden enemy stack'
-                    : `${isOpponent ? 'Enemy' : 'Your'} ${stack.empowered ? 'empowered ' : ''}${stack.name} x${stack.qty}, ${stack.pts} pts each`);
+                    ? 'Hidden enemy card'
+                    : `${isOpponent ? 'Enemy' : 'Your'} ${stack.empowered ? 'upgraded ' : ''}level ${stack.level} ${stack.name}, ${stackPoints(stack)} points`);
 
                 const art = slot.querySelector('.card-art');
                 if (art && art.getAttribute('src') !== artSrc(stack, stack.empowered)) {
                     art.setAttribute('src', artSrc(stack, stack.empowered));
                 }
 
-                const badge = slot.querySelector('.badge-qty');
-                const qtyText = `x${stack.qty}`;
-                if (badge.textContent !== qtyText) {
-                    badge.textContent = qtyText;
-                    badge.classList.remove('badge-bump');
-                    void badge.offsetWidth;
-                    badge.classList.add('badge-bump');
+                // Points pulse whenever they change (a matching card joins, or Animate Dead)
+                const points = slot.querySelector('.card-points');
+                const pointsText = String(stackPoints(stack));
+                const value = points.querySelector('.card-points-value');
+                if (value.textContent !== pointsText) {
+                    value.textContent = pointsText;
+                    points.classList.remove('badge-bump');
+                    void points.offsetWidth;
+                    points.classList.add('badge-bump');
                 }
             }
         }
@@ -912,9 +950,8 @@
                                 <div class="card-name" style="${textStyle}">${stack.name}</div>
                                 <div class="card-sigil" style="${textStyle}">${stack.art ? '' : '☠'}</div>
                                 <div class="card-foot">
-                                    <span class="badge-pts" style="border-color: ${stack.color}; color: ${stack.color};">${stack.pts} pts</span>
+                                    <span class="card-points" style="border-color: ${stack.color}; color: ${stack.color};"><span class="card-points-value">${stackPoints(stack)}</span><small>pts</small></span>
                                 </div>
-                                <div class="badge-qty" style="border-color: ${stack.color};">x${stack.qty}</div>
                             </div>
                             <div class="card-face card-back"></div>
                         </div>
@@ -935,7 +972,7 @@
                 // Cards saved by an older version of the page may lack newer fields such as art
                 [...deck, ...playerArmy, ...opponentArmy].forEach(card => {
                     const unit = UNIT_DATA.find(u => u.name === card.name);
-                    if (unit) Object.assign(card, { pts: unit.pts, color: unit.color, art: unit.art });
+                    if (unit) Object.assign(card, { level: unit.level, pts: unit.pts, color: unit.color, art: unit.art });
                 });
                 setTargeting(false);
                 updateUI();

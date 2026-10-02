@@ -55,17 +55,19 @@ A dark-fantasy betting card game in a single HTML file: [`necropolis-casino/inde
 
 **Play:** open `necropolis-casino/index.html` in any modern browser. It is a single self-contained file: the card pictures and styles are built into it, so it works on its own and offline (online it also loads the Cinzel font from Google Fonts).
 
-**Rules:** bet gold, then draw five undead units. Each round you get one spell: *Animate Dead* doubles one of your stacks and upgrades it to its stronger form, *Implosion* destroys an enemy stack (enemy cards stay face down until you resolve the round). The AI casts its own spell when the round resolves, and its Animate Dead upgrades its stack the same way. After three rounds the stronger army wins double the pot. Your gold balance is saved in the browser.
+**Rules:** bet gold, then draw five undead cards. Each card shows only the points it gives; its colour shows the creature's level (a colour key sits under the rules). Matching cards join together and add up their points. Each round you get one spell: *Animate Dead* doubles one of your cards' points and upgrades it to its stronger form, *Implosion* destroys an enemy card (enemy cards stay face down until you resolve the round). The AI casts its own spell when the round resolves, and its Animate Dead upgrades its card the same way. After three rounds the stronger army wins double the pot. Your gold balance is saved in the browser.
 
-| Level | Creature | In deck | Power each | Level total |
-|---|---|---|---|---|
-| 1 | Skeleton | 20 | 1 | 20 |
-| 2 | Zombie | 12 | 2 | 24 |
-| 3 | Wight | 9 | 3 | 27 |
-| 4 | Vampire | 8 | 4 | 32 |
-| 5 | Lich | 6 | 7 | 42 |
-| 6 | Dark Knight | 3 | 17 | 51 |
-| 7 | Bone Dragon | 1 | 60 | 60 |
+A card spawns a group of creatures, so its points are spawn x power:
+
+| Level | Colour | Creature | Spawns | Power each | Card gives | Cards in deck |
+|---|---|---|---|---|---|---|
+| 1 | Gray | Skeleton | 20 | 1 | 20 pts | 20 |
+| 2 | Green | Zombie | 12 | 2 | 24 pts | 12 |
+| 3 | Blue | Wight | 9 | 3 | 27 pts | 9 |
+| 4 | Purple | Vampire | 8 | 4 | 32 pts | 8 |
+| 5 | Orange | Lich | 6 | 7 | 42 pts | 6 |
+| 6 | Red | Dark Knight | 3 | 17 | 51 pts | 3 |
+| 7 | Gold | Bone Dragon | 1 | 60 | 60 pts | 1 |
 
 **Card art:** every creature is drawn in one shared pixel-art style (same palette, outline and crypt alcove) so the whole army reads as one Necropolis. A unit shows its weaker base form (`necropolis-casino/img/<unit>.png`); the stronger form (`<unit>-empowered.png`, in a green spectral alcove) appears only after Animate Dead is cast on that stack.
 
