@@ -502,7 +502,7 @@
             <span class="text-green-400">Animate Dead</span> doubles one of your cards and upgrades it,
             <span class="text-purple-400">Implosion</span> destroys an enemy card. The AI casts its spell after yours.
             Tip: the AI hunts your biggest card, so destroying its biggest card is usually the safe play.
-            You bet once, before round 1. If your army is stronger after three rounds, you get your bet back plus winnings of bet &times; (your points &minus; AI points) &divide; 100; a draw returns your bet.
+            You bet once, before round 1. If your army is stronger after three rounds, you get your bet back plus winnings of bet &times; 0.20 &times; (your points &divide; 100); a draw returns your bet.
         </p>
         <ul id="level-legend" class="level-legend" aria-label="Card colour for each level"></ul>
     </section>
@@ -998,9 +998,11 @@
             }
         }
 
-        // A win returns your bet plus winnings of bet x (your points - AI points) / 100
-        function winWinnings(bet, playerPts, aiPts) {
-            return Math.floor(bet * (playerPts - aiPts) / 100);
+        // A win returns your bet plus winnings of bet x 0.20 x (your points / 100), rounded down to whole gold.
+        // Tuned with the AI's smart chance so even the strongest strategy found returns about 96% (RTP)
+        const WIN_RATE_PERCENT = 20; // 0.20 of the bet for every 100 points in your army
+        function winWinnings(bet, playerPts) {
+            return Math.floor(bet * playerPts * WIN_RATE_PERCENT / 10000);
         }
 
         function finalizeGame() {
@@ -1008,9 +1010,9 @@
             const oStrength = getArmyStrength(opponentArmy);
 
             if (pStrength > oStrength) {
-                const winnings = winWinnings(totalPot, pStrength, oStrength);
+                const winnings = winWinnings(totalPot, pStrength);
                 gold += totalPot + winnings;
-                showToast(`VICTORY by ${pStrength - oStrength} pts! Your ${totalPot} gold bet comes back with ${winnings} gold winnings.`, 5000);
+                showToast(`VICTORY with ${pStrength} pts! Your ${totalPot} gold bet comes back with ${winnings} gold winnings.`, 5000);
             } else if (oStrength > pStrength) {
                 showToast("DEFEAT. The Necropolis claims your soul and your gold.", 5000);
             } else {
