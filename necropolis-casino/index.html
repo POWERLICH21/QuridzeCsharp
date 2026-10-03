@@ -475,7 +475,7 @@
             <div class="flex flex-col gap-1">
                 <label for="bet-input" class="sr-only">Bet amount in gold</label>
                 <input type="number" id="bet-input" min="0" step="1" inputmode="numeric" placeholder="Bet Amount" class="bg-gray-900 border border-gray-700 rounded px-3 py-1 text-white w-40 focus:outline-none focus:border-gray-500">
-                <div class="text-sm text-yellow-500">Total Pot: <span id="pot-display" class="font-bold text-lg tabular-nums">0</span></div>
+                <div class="text-sm text-yellow-500">Your Bet: <span id="pot-display" class="font-bold text-lg tabular-nums">0</span></div>
                 <div class="text-sm text-gray-300">Gold: <span id="gold-display" class="font-bold tabular-nums">1000</span></div>
             </div>
         </div>
@@ -501,7 +501,7 @@
             Matching cards join into one pile: the x2, x3 badge shows how many, and their points add up. Each round you get one spell:
             <span class="text-green-400">Animate Dead</span> doubles one of your cards and upgrades it,
             <span class="text-purple-400">Implosion</span> destroys an enemy card.
-            After three rounds the stronger army wins double the pot.
+            You bet once, before round 1. If your army is stronger after three rounds, you win your bet &times; (your points &minus; AI points + your points &divide; 10); a draw returns your bet.
         </p>
         <ul id="level-legend" class="level-legend" aria-label="Card colour for each level"></ul>
     </section>
@@ -693,24 +693,22 @@
         els.btnDraw.addEventListener('click', async () => {
             if (phase !== 'BETTING' || busy) return;
 
-            // Round 1 needs a stake; later rounds may raise or check with 0
-            const raw = els.betInput.value.trim();
-            const bet = raw === '' && currentRound > 1 ? 0 : Number(raw);
-            if (!Number.isInteger(bet) || bet < 0 || (currentRound === 1 && bet === 0)) {
-                showToast(currentRound === 1
-                    ? "Place a bet of at least 1 gold to begin."
-                    : "Enter a whole number of gold, or 0 to check.");
-                return;
+            // The bet is placed once, before round 1, and stays locked for the whole game
+            if (currentRound === 1) {
+                const bet = Number(els.betInput.value.trim());
+                if (!Number.isInteger(bet) || bet < 1) {
+                    showToast("Place a bet of at least 1 gold to begin.");
+                    return;
+                }
+                if (bet > gold) {
+                    showToast(`You only have ${gold} gold.`);
+                    return;
+                }
+                gold -= bet;
+                saveGold();
+                totalPot = bet;
+                els.betInput.value = bet;
             }
-            if (bet > gold) {
-                showToast(`You only have ${gold} gold.`);
-                return;
-            }
-
-            gold -= bet;
-            saveGold();
-            totalPot += bet;
-            els.betInput.value = '';
             phase = 'ACTION';
             fogOfWar = true;
             spellAvailable = true;
@@ -924,7 +922,7 @@
             phase = 'BETTING';
             fogOfWar = true; // Fog returns next round
             updateUI();
-            showToast(`Round ${currentRound} begins. Raise your bet or enter 0 to check.`);
+            showToast(`Round ${currentRound} begins. Your bet is locked in: draw your next five cards.`);
         });
 
         async function aiTurn() {
@@ -959,18 +957,25 @@
             }
         }
 
+        // A win pays your bet x ((your points - AI points) + your points / 10)
+        function winMultiplier(playerPts, aiPts) {
+            return (playerPts - aiPts) + playerPts / 10;
+        }
+
         function finalizeGame() {
             const pStrength = getArmyStrength(playerArmy);
             const oStrength = getArmyStrength(opponentArmy);
 
             if (pStrength > oStrength) {
-                gold += totalPot * 2;
-                showToast(`VICTORY! You won ${totalPot * 2} Gold!`, 5000);
+                const multiplier = winMultiplier(pStrength, oStrength);
+                const payout = Math.floor(totalPot * multiplier);
+                gold += payout;
+                showToast(`VICTORY! ${pStrength} vs ${oStrength}: your bet x ${multiplier} = ${payout} gold!`, 5000);
             } else if (oStrength > pStrength) {
                 showToast("DEFEAT. The Necropolis claims your soul and your gold.", 5000);
             } else {
                 gold += totalPot;
-                showToast("DRAW. The dead rest easy. Your bets are returned.", 5000);
+                showToast("DRAW. The dead rest easy. Your bet is returned.", 5000);
             }
             saveGold();
             updateUI();
@@ -992,8 +997,7 @@
             els.btnSpell.disabled = (!spellAvailable || phase !== 'ACTION' || busy);
             els.btnSpell.textContent = spellLabel();
             els.btnResolve.disabled = (phase !== 'ACTION' || busy);
-            els.betInput.disabled = (phase !== 'BETTING' || busy);
-            els.betInput.placeholder = currentRound === 1 ? 'Bet Amount' : '0 to check';
+            els.betInput.disabled = (phase !== 'BETTING' || busy || currentRound > 1);
 
             // Strengths
             els.playerStrength.textContent = getArmyStrength(playerArmy);
