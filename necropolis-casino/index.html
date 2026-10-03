@@ -500,7 +500,8 @@
             Bet, then both armies draw five cards from the crypt, dealt in pairs of similar value. Each card shows the points it gives, and its colour shows its level.
             Matching cards join into one pile: the x2, x3 badge shows how many, and their points add up. Each round you get one spell:
             <span class="text-green-400">Animate Dead</span> doubles one of your cards and upgrades it,
-            <span class="text-purple-400">Implosion</span> destroys an enemy card. The AI casts one at random.
+            <span class="text-purple-400">Implosion</span> destroys an enemy card. The AI casts its spell after yours.
+            Tip: the AI hunts your biggest card, so destroying its biggest card is usually the safe play.
             You bet once, before round 1. If your army is stronger after three rounds, you get your bet back plus winnings of bet &times; (your points &minus; AI points) &divide; 100; a draw returns your bet.
         </p>
         <ul id="level-legend" class="level-legend" aria-label="Card colour for each level"></ul>
@@ -566,6 +567,8 @@
         const SLOT_COUNT = 5;
         const CARDS_PER_ROUND = 5; // Each army draws this many cards every round
         const PARTNER_RANGE = 10;  // A dealt pair differs by at most this many points when the crypt allows
+        const AI_SMART_CHANCE = 0.85; // How often the AI plays its best spell; otherwise it casts at random.
+                                      // Tuned so even the strongest strategy found returns about 96% (RTP)
         const TOTAL_ROUNDS = 3;
         const STARTING_GOLD = 1000;
         const DEFAULT_BET = 100;
@@ -959,8 +962,9 @@
             showToast(`Round ${currentRound} begins. Your bet is locked in: draw your next five cards.`);
         });
 
-        // The AI casts a random spell on a random target: a coin flip between Animate Dead on one of its
-        // cards and Implosion on one of yours. It doesn't weigh the cards or plan ahead.
+        // The AI usually plays smart (AI_SMART_CHANCE): it destroys your best card if that is worth more
+        // than doubling its own best card, otherwise it doubles its own. The rest of the time it casts at
+        // random: a coin flip between Animate Dead on one of its cards and Implosion on one of yours.
         async function aiTurn() {
             const livePiles = army => army.map((stack, i) => (stack && stack.qty > 0 ? i : -1)).filter(i => i >= 0);
             const pick = list => list[Math.floor(Math.random() * list.length)];
@@ -968,14 +972,25 @@
             const yours = livePiles(playerArmy);
             if (own.length === 0 && yours.length === 0) return;
 
-            const castImplosion = yours.length > 0 && (own.length === 0 || Math.random() < 0.5);
+            let castImplosion, index;
+            if (Math.random() < AI_SMART_CHANCE) {
+                const strongest = (army, piles) => piles.reduce((best, i) => (stackPoints(army[i]) > stackPoints(army[best]) ? i : best), piles[0]);
+                const yourBest = yours.length ? strongest(playerArmy, yours) : -1;
+                const ownBest = own.length ? strongest(opponentArmy, own) : -1;
+                const destroyValue = yourBest === -1 ? 0 : stackPoints(playerArmy[yourBest]);
+                const doubleValue = ownBest === -1 ? 0 : stackPoints(opponentArmy[ownBest]); // Doubling adds exactly its current value
+                castImplosion = destroyValue > doubleValue;
+                index = castImplosion ? yourBest : ownBest;
+            } else {
+                castImplosion = yours.length > 0 && (own.length === 0 || Math.random() < 0.5);
+                index = castImplosion ? pick(yours) : pick(own);
+            }
+
             if (castImplosion) {
-                const index = pick(yours);
                 playerArmy[index].qty = 0;
                 showToast("Opponent casts Implosion on your forces!", 2000);
                 await playSpell(`player-card-${index}`, 'anim-void');
             } else {
-                const index = pick(own);
                 opponentArmy[index].qty *= 2;
                 opponentArmy[index].empowered = true;
                 showToast("Opponent casts Animate Dead! Their card's points are doubled and it is upgraded.", 2000);

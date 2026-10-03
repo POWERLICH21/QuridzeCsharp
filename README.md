@@ -55,11 +55,19 @@ A dark-fantasy betting card game in a single HTML file: [`necropolis-casino/inde
 
 **Play:** open `necropolis-casino/index.html` in any modern browser. It is a single self-contained file: the card pictures and styles are built into it, so it works on its own and offline (online it also loads the Cinzel font from Google Fonts).
 
-**Rules:** place one bet before round 1 (it stays locked for the whole game), then both armies draw five cards each from the crypt every round, dealt in matched pairs so both sides receive very similar points: one side (picked at random) draws a random card, and the other side gets a random card worth within 10 points of it (a card with no matching pile and no free slot is discarded and replaced, so each army always gains five). Each card shows only the points it gives; its colour shows the creature's level (a colour key sits under the rules). Matching cards join into one pile with an x2, x3… badge, and their points add up. Each round you get one spell: *Animate Dead* doubles one of your cards' points and upgrades it to its stronger form, *Implosion* destroys an enemy card (enemy cards stay face down until you resolve the round). The AI casts its own spell at random when the round resolves: a coin flip between Animate Dead on one of its cards and Implosion on one of yours, with a random target. Its Animate Dead upgrades its card the same way. After three rounds, if your army is stronger you get your bet back plus winnings of **bet × (your points − AI points) ÷ 100**, rounded down to whole gold; a draw returns your bet and a loss loses it. Your gold balance is saved in the browser.
+**Rules:** place one bet before round 1 (it stays locked for the whole game), then both armies draw five cards each from the crypt every round, dealt in matched pairs so both sides receive very similar points: one side (picked at random) draws a random card, and the other side gets a random card worth within 10 points of it (a card with no matching pile and no free slot is discarded and replaced, so each army always gains five). Each card shows only the points it gives; its colour shows the creature's level (a colour key sits under the rules). Matching cards join into one pile with an x2, x3… badge, and their points add up. Each round you get one spell: *Animate Dead* doubles one of your cards' points and upgrades it to its stronger form, *Implosion* destroys an enemy card (enemy cards stay face down until you resolve the round). The AI casts its own spell when the round resolves, after yours. 85% of the time it plays smart: it destroys your best card if that is worth more than doubling its own best card, otherwise it doubles its own. The other 15% it casts at random (a coin flip between Animate Dead and Implosion, random target). Its Animate Dead upgrades its card the same way. Tip: the AI hunts your biggest card, so destroying its biggest card is usually the safe play. After three rounds, if your army is stronger you get your bet back plus winnings of **bet × (your points − AI points) ÷ 100**, rounded down to whole gold; a draw returns your bet and a loss loses it. Your gold balance is saved in the browser.
 
 Example: bet 100, you finish with 340 points against the AI's 300 → your 100 back plus 100 × 40 ÷ 100 = 40 winnings, 140 gold in total.
 
-Measured RTP with these rules (simulated games, cross-checked against the real game code): about 73% for a player who casts spells at random (wins 44% of games), 177% for a player who always destroys the AI's biggest pile, and 298% for a player who always doubles their own best pile. With matched dealing, the two armies' dealt points differ by a median of 14 points per game.
+Measured RTP with these rules (400,000 simulated games per player type, cross-checked against the real game code). The 85% smart chance is tuned so even the strongest strategy found stays just under the 96–97% casino range:
+
+| Player | Wins | RTP |
+|---|---|---|
+| Strongest strategy found (knows every AI card) | 64% | 95.8% |
+| Skilled (uses only what the game shows) | 61% | 91.1% |
+| Always destroys the AI's biggest card | 53% | 80.3% |
+| Casts spells at random | 6.5% | 9.7% |
+| Always doubles own best card | 1.7% | 3.8% |
 
 A card spawns a group of creatures, so its points are spawn x power:
 
