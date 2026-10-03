@@ -59,15 +59,17 @@ A dark-fantasy betting card game in a single HTML file: [`necropolis-casino/inde
 
 Example: bet 100, you win with 300 points → your 100 back plus 100 × 0.20 × 3 = 60 winnings, 160 gold in total.
 
-Measured RTP with these rules (300,000 simulated games per player type, cross-checked against the real game code). The 0.20 rate and the AI's 85% smart chance are tuned so even the strongest strategy found stays at about 96%:
+**Crypt Fortune (big wins):** after every win a luck roll may multiply your winnings (your bet still comes back once): **Lucky Win ×2** (1 in 50 wins), **BIG WIN ×10** (1 in 1,000), **MEGA WIN ×50** (1 in 20,000). It is rolled after the result with the bet already locked, so no strategy can change the odds; a reel spins and a banner shows the result. Example: bet 100, win with 300 points → normal 160 gold, Lucky 220, BIG 700, MEGA 3,100.
+
+Measured RTP with these rules (300,000 simulated games per player type, cross-checked against the real game code; the Crypt Fortune adds an exact +3.15% to average winnings). The 0.20 rate, the AI's 85% smart chance and the fortune odds keep even the strongest strategy found under 97.5%:
 
 | Player | Wins | RTP |
 |---|---|---|
-| Strongest strategy found (knows every AI card) | 63% | 96.4% |
-| Skilled (uses only what the game shows) | 61% | 90.5% |
-| Always destroys the AI's biggest card | 53% | 79.7% |
-| Casts spells at random | 6.4% | 10.6% |
-| Always doubles own best card | 1.8% | 3.9% |
+| Strongest strategy found (knows every AI card) | 63% | 97.4% |
+| Skilled (uses only what the game shows) | 61% | 91.5% |
+| Always destroys the AI's biggest card | 53% | 80.6% |
+| Casts spells at random | 6.4% | 10.7% |
+| Always doubles own best card | 1.8% | 4.0% |
 
 A card spawns a group of creatures, so its points are spawn x power:
 
