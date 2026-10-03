@@ -501,7 +501,7 @@
             Matching cards join into one pile: the x2, x3 badge shows how many, and their points add up. Each round you get one spell:
             <span class="text-green-400">Animate Dead</span> doubles one of your cards and upgrades it,
             <span class="text-purple-400">Implosion</span> destroys an enemy card.
-            You bet once, before round 1. If your army is stronger after three rounds, you win your bet &times; (your points &minus; AI points + your points &divide; 10); a draw returns your bet.
+            You bet once, before round 1. If your army is stronger after three rounds, you get your bet back plus winnings of bet &times; (your points &minus; AI points) &divide; 100; a draw returns your bet.
         </p>
         <ul id="level-legend" class="level-legend" aria-label="Card colour for each level"></ul>
     </section>
@@ -957,9 +957,9 @@
             }
         }
 
-        // A win pays your bet x ((your points - AI points) + your points / 10)
-        function winMultiplier(playerPts, aiPts) {
-            return (playerPts - aiPts) + playerPts / 10;
+        // A win returns your bet plus winnings of bet x (your points - AI points) / 100
+        function winWinnings(bet, playerPts, aiPts) {
+            return Math.floor(bet * (playerPts - aiPts) / 100);
         }
 
         function finalizeGame() {
@@ -967,10 +967,9 @@
             const oStrength = getArmyStrength(opponentArmy);
 
             if (pStrength > oStrength) {
-                const multiplier = winMultiplier(pStrength, oStrength);
-                const payout = Math.floor(totalPot * multiplier);
-                gold += payout;
-                showToast(`VICTORY! ${pStrength} vs ${oStrength}: your bet x ${multiplier} = ${payout} gold!`, 5000);
+                const winnings = winWinnings(totalPot, pStrength, oStrength);
+                gold += totalPot + winnings;
+                showToast(`VICTORY by ${pStrength - oStrength} pts! Your ${totalPot} gold bet comes back with ${winnings} gold winnings.`, 5000);
             } else if (oStrength > pStrength) {
                 showToast("DEFEAT. The Necropolis claims your soul and your gold.", 5000);
             } else {
