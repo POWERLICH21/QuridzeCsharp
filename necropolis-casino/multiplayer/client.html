@@ -1432,6 +1432,14 @@
         // --- RUN: rejoin this tab's seat if there is one, otherwise ask for a name ---
         (async function start() {
             updateUI();
+            if (location.protocol === 'file:') {
+                // Opened straight from the folder: the game only works through the server
+                els.joinError.textContent = 'This file can\'t be opened directly. Close it, double-click start-server.bat (Mac: start-server.command) in the same folder, and the game opens in your browser.';
+                els.joinName.disabled = true;
+                els.joinForm.querySelector('button').disabled = true;
+                els.join.hidden = false;
+                return;
+            }
             const savedName = store.get('localStorage', 'necropolis-duel-name') || '';
             const savedToken = store.get('sessionStorage', 'necropolis-duel-token');
             els.joinName.value = savedName;

@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
+const { spawn } = require('child_process');
 
 const PORT = Number(process.env.PORT || 8080);
 const CLIENT_FILE = path.join(__dirname, 'client.html');
@@ -431,4 +432,26 @@ server.listen(PORT, '0.0.0.0', () => {
         }
     }
     console.log('Keep this window open while you play. Press Ctrl+C to stop the server.');
+    if (!process.env.NO_BROWSER) openBrowser(`http://localhost:${PORT}`);
 });
+server.on('error', (e) => {
+    if (e.code === 'EADDRINUSE') {
+        console.error(`Port ${PORT} is already in use, so the server is probably already running in another window.`);
+        console.error(`Use that window and open http://localhost:${PORT}, or close it and start this again.`);
+    } else {
+        console.error('The server could not start:', e.message);
+    }
+    process.exitCode = 1;
+});
+
+// Opens the game for the host on Windows and macOS (set NO_BROWSER=1 to skip)
+function openBrowser(url) {
+    const command = process.platform === 'win32' ? ['cmd', ['/c', 'start', '""', url]]
+        : process.platform === 'darwin' ? ['open', [url]] : null;
+    if (!command) return;
+    try {
+        const child = spawn(command[0], command[1], { stdio: 'ignore', detached: true, windowsVerbatimArguments: true });
+        child.on('error', () => {});
+        child.unref();
+    } catch (e) { /* The address is printed above, so it can be opened by hand */ }
+}
