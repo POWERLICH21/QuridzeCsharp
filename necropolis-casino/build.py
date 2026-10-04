@@ -1,13 +1,14 @@
-"""Bundles the game into one self-contained index.html.
+"""Bundles a game page into one self-contained HTML file.
 
 - Card pictures from img/ are embedded as data URIs (the build:card-art block),
   so the page shows them even when opened on its own, without the img/ folder.
 - Tailwind styles are precompiled into the page (the build:tailwind block), so
   there is no Tailwind CDN script. This step needs Node.js (it runs npx).
 
-Run it after changing the card art or the Tailwind classes in index.html:
-    python3 build.py              # pictures and styles
-    python3 build.py --art-only   # pictures only, no Node.js needed
+Run it after changing the card art or the Tailwind classes in a page:
+    python3 build.py                          # index.html: pictures and styles
+    python3 build.py multiplayer/client.html  # the two-player page
+    python3 build.py --art-only               # pictures only, no Node.js needed
 """
 import base64
 import json
@@ -19,7 +20,6 @@ import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).parent
-PAGE = HERE / 'index.html'
 TAILWIND = 'tailwindcss@3.4.17'
 
 
@@ -28,7 +28,7 @@ def replace_block(html, name, body):
     pattern = re.compile(rf'(<!-- build:{name}\b[^>]*-->\n)(.*?)(\n[ \t]*<!-- /build:{name} -->)', re.S)
     html, count = pattern.subn(lambda m: m.group(1) + body + m.group(3), html)
     if count != 1:
-        raise SystemExit(f'build:{name} block not found in index.html')
+        raise SystemExit(f'build:{name} block not found in the page')
     return html
 
 
@@ -57,12 +57,14 @@ def tailwind_block(html):
 
 
 def main():
-    html = PAGE.read_text(encoding='utf-8')
+    pages = [arg for arg in sys.argv[1:] if not arg.startswith('--')]
+    page = Path(pages[0]) if pages else HERE / 'index.html'
+    html = page.read_text(encoding='utf-8')
     html = replace_block(html, 'card-art', card_art_block())
     if '--art-only' not in sys.argv:
         html = replace_block(html, 'tailwind', tailwind_block(html))
-    PAGE.write_text(html, encoding='utf-8')
-    print(f'built {PAGE.name} ({PAGE.stat().st_size // 1024} KB)')
+    page.write_text(html, encoding='utf-8')
+    print(f'built {page} ({page.stat().st_size // 1024} KB)')
 
 
 if __name__ == '__main__':

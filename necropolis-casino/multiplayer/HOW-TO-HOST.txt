@@ -1,0 +1,69 @@
+NECROPOLIS CASINO DUEL - HOW TO HOST A GAME FROM YOUR PC
+=========================================================
+
+Your PC runs a small game server. You and your opponent each open the game
+in a browser. The server deals the cards and keeps each player's hidden
+cards secret, so nobody can peek at the other army.
+
+
+1. ONE-TIME SETUP
+-----------------
+Install Node.js (the free "LTS" version) from https://nodejs.org
+Nothing else is needed; the server uses no extra packages.
+
+
+2. START THE SERVER
+-------------------
+Windows:  double-click  start-server.bat
+macOS:    double-click  start-server.command
+          (first time: right-click it > Open, because it was downloaded)
+Linux, or any system from a terminal in this folder:
+          node server.js
+
+A window opens and shows lines like:
+
+    On this PC:            http://localhost:8080
+    On your Wi-Fi/network: http://192.168.1.23:8080
+
+If Windows asks whether Node.js may use the network, click "Allow"
+(private networks are enough).
+
+Keep that window open while you play. Close it (or press Ctrl+C) to stop.
+
+
+3. PLAY
+-------
+You:            open  http://localhost:8080  in your browser.
+Your opponent:  see the options below.
+Both of you type a name and press "Join the Table".
+
+
+   A) Same Wi-Fi / home network (easiest)
+      Send your opponent the "On your Wi-Fi/network" address from the
+      server window, e.g. http://192.168.1.23:8080
+
+   B) Over the internet, with a tunnel (no router settings)
+      Install ngrok (https://ngrok.com, free account), then in a second
+      window run:
+          ngrok http 8080
+      It prints a public https://....ngrok-free.app address. Send that
+      to your opponent. Stop ngrok when you're done playing.
+
+   C) Over the internet, with your router
+      In your router's settings, forward TCP port 8080 to this PC, then
+      send your opponent  http://YOUR-PUBLIC-IP:8080  (find your public
+      IP by searching "what is my IP"). Only open the port while you
+      play, and close it afterwards.
+
+
+GOOD TO KNOW
+------------
+- Two players per table. A third visitor sees "The table is full".
+- Reloading the page keeps your seat. If a player is gone for more than a
+  minute, someone new can take their seat (a new game starts).
+- Each player's gold is saved in their own browser, under their name.
+- Restarting the server clears the table; just join again.
+- To use a different port:  set PORT=9000 && node server.js  (Windows)
+                            PORT=9000 node server.js          (macOS/Linux)
+- This is play money only. Players control their own gold in their own
+  browser, so don't use it for real-money bets.

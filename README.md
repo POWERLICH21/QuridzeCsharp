@@ -83,6 +83,8 @@ A card spawns a group of creatures, so its points are spawn x power:
 | 6 | Red | Dark Knight | 3 | 17 | 51 pts | 3 |
 | 7 | Gold | Bone Dragon | 1 | 60 | 60 pts | 1 |
 
+**Two-player duel (multiplayer):** `necropolis-casino/multiplayer/` holds a version for two people on two computers. `server.js` (Node.js, no extra packages) runs the game and sends each player only what they may see, so the fog of war holds; `client.html` is the page both players open. Each round both players secretly plan one spell, press Ready, and both spells take effect together before both armies are revealed. Betting, payouts and the Crypt Fortune work as in the single-player game. To host from your PC: install Node.js, double-click `start-server.bat` (Windows) or `start-server.command` (macOS), or run `node server.js`; then follow `HOW-TO-HOST.txt` (same Wi-Fi, an ngrok tunnel, or router port forwarding). After editing `client.html`, rebuild it with `python3 build.py multiplayer/client.html`.
+
 **Card art:** every creature is drawn in one shared pixel-art style (same palette, outline and crypt alcove) so the whole army reads as one Necropolis. A unit shows its weaker base form (`necropolis-casino/img/<unit>.png`); the stronger form (`<unit>-empowered.png`, in a green spectral alcove) appears only after Animate Dead is cast on that stack.
 
 The art is built from the original images in `necropolis-casino/art-source/` in two steps:
