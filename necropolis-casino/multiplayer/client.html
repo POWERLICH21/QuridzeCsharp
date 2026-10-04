@@ -768,7 +768,7 @@
         let token = null;
         let myName = '';
         let gold = STARTING_GOLD;
-        let events = null;
+        let pollLoop = 0;         // Bumped when a new listening loop replaces the old one
 
         // --- DOM ELEMENTS ---
         const els = {
@@ -852,8 +852,11 @@
         }
 
         // --- TALKING TO THE SERVER ---
+        // Skips the warning page ngrok's free tunnels put in front of a site
+        const TUNNEL_HEADERS = { 'ngrok-skip-browser-warning': '1' };
+
         async function post(path, body) {
-            const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            const res = await fetch(path, { method: 'POST', headers: { ...TUNNEL_HEADERS, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.error || 'The server did not answer.');
             return data;
@@ -876,22 +879,36 @@
             store.set('localStorage', 'necropolis-duel-name', name);
             gold = loadGold();
             els.join.hidden = true;
-            connectEvents();
+            listenToServer();
         }
 
-        function connectEvents() {
-            if (events) events.close();
-            events = new EventSource(`events?token=${encodeURIComponent(token)}`);
-            events.onmessage = (e) => enqueue(JSON.parse(e.data));
-            events.onerror = () => {
-                if (events.readyState === EventSource.CLOSED) {
-                    // The server forgot this seat (it was restarted): join again
-                    els.joinError.textContent = 'Lost the table. Join again to keep playing.';
-                    els.join.hidden = false;
-                } else {
-                    showToast('Connection lost. Reconnecting…', 2500);
+        // Keeps asking the server for news; each question waits up to 25 seconds for something to happen
+        async function listenToServer() {
+            const loop = ++pollLoop;
+            let after = -1;
+            let failures = 0;
+            while (loop === pollLoop) {
+                try {
+                    const res = await fetch(`poll?token=${encodeURIComponent(token)}&after=${after}`, { cache: 'no-store', headers: TUNNEL_HEADERS });
+                    if (loop !== pollLoop) return;
+                    if (res.status === 401) {
+                        // The server forgot this seat (it was restarted): join again
+                        els.joinError.textContent = 'Lost the table. Join again to keep playing.';
+                        els.join.hidden = false;
+                        return;
+                    }
+                    if (!res.ok) throw new Error(`The server answered ${res.status}`);
+                    const data = await res.json();
+                    if (loop !== pollLoop) return;
+                    failures = 0;
+                    after = data.seq;
+                    for (const message of data.messages) enqueue(message);
+                } catch (e) {
+                    if (loop !== pollLoop) return;
+                    if (failures++ % 5 === 0) showToast('Connection lost. Reconnecting…', 2500);
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                 }
-            };
+            }
         }
 
         els.joinForm.addEventListener('submit', async (e) => {

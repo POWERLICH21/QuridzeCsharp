@@ -46,7 +46,10 @@ const table = { seats: [null, null], phase: 'lobby', round: 0, deck: [], gameId:
 let nextPileId = 1;
 
 function newSeat(name) {
-    return { token: crypto.randomUUID(), name, clients: new Set(), goneSince: null, army: [], bet: 0, ready: false, spell: null };
+    return {
+        token: crypto.randomUUID(), name, army: [], bet: 0, ready: false, spell: null,
+        outbox: [], seq: 0, waiters: new Set(), online: false, awayTimer: null, goneSince: Date.now(),
+    };
 }
 
 function buildDeck() {
@@ -157,7 +160,7 @@ function stateFor(i) {
         fog: !(table.phase === 'reveal' || table.phase === 'finished'),
         you: { seat: i, name: me.name, bet: me.bet, ready: me.ready, spell: me.spell, army: armyView(me.army, true) },
         opp: opp ? {
-            name: opp.name, connected: opp.clients.size > 0, betPlaced: opp.bet > 0,
+            name: opp.name, connected: opp.online, betPlaced: opp.bet > 0,
             ready: opp.ready, spellChosen: Boolean(opp.spell), army: armyView(opp.army, false),
         } : null,
         result: table.phase === 'finished' && table.result ? table.result[i] : null,
@@ -189,12 +192,31 @@ function dealEventFor(i, pairs) {
     };
 }
 
-// --- Sending to players (Server-Sent Events) ---
+// --- Sending to players (long polling) ---
+// Each browser keeps asking "anything new?" and the server answers as soon as something happens.
+// Plain requests and answers get through every tunnel and proxy, unlike a stream held open.
+const POLL_WAIT_MS = 25 * 1000; // How long a question waits for news before the answer is "nothing new"
+const AWAY_MS = 8 * 1000;       // A player whose browser stops asking for this long is shown as away
+const OUTBOX_SIZE = 200;        // Recent messages kept per player, to resend after a short drop
+
 function send(i, message) {
     const seat = table.seats[i];
     if (!seat) return;
-    const data = `data: ${JSON.stringify(message)}\n\n`;
-    for (const res of seat.clients) res.write(data);
+    seat.outbox.push({ seq: ++seat.seq, message });
+    if (seat.outbox.length > OUTBOX_SIZE) seat.outbox.shift();
+    for (const waiter of [...seat.waiters]) answerPoll(seat, waiter);
+}
+function answerPoll(seat, waiter) {
+    seat.waiters.delete(waiter);
+    clearTimeout(waiter.timer);
+    const messages = seat.outbox.filter(entry => entry.seq > waiter.after).map(entry => entry.message);
+    reply(waiter.res, 200, { seq: seat.seq, messages });
+}
+function setOnline(i, seat, online) {
+    if (table.seats[i] !== seat || seat.online === online || (!online && seat.waiters.size > 0)) return;
+    seat.online = online;
+    seat.goneSince = online ? null : Date.now();
+    if (table.seats[1 - i]) send(1 - i, stateFor(1 - i)); // The opponent sees you come and go
 }
 function broadcastState() {
     for (const i of [0, 1]) if (table.seats[i]) send(i, stateFor(i));
@@ -344,7 +366,7 @@ function join(name, token) {
 
     let index = table.seats.findIndex(seat => !seat);
     if (index === -1) {
-        index = table.seats.findIndex(seat => seat.clients.size === 0 && seat.goneSince && Date.now() - seat.goneSince > SEAT_RECLAIM_MS);
+        index = table.seats.findIndex(seat => !seat.online && Date.now() - seat.goneSince > SEAT_RECLAIM_MS);
         if (index === -1) return { error: 'The table is full: two players are already playing.' };
         const other = 1 - index;
         notify(other, `${table.seats[index].name} left the table. ${name} takes the empty seat; a new game begins.`);
@@ -380,26 +402,30 @@ const server = http.createServer(async (req, res) => {
             fs.createReadStream(CLIENT_FILE).pipe(res);
             return;
         }
-        if (req.method === 'GET' && url.pathname === '/events') {
+        if (req.method === 'GET' && url.pathname === '/poll') {
             const i = seatOf(url.searchParams.get('token'));
             if (i === -1) return reply(res, 401, { error: 'Unknown player. Join the table again.' });
-            res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
-            res.write('retry: 2000\n\n');
             const seat = table.seats[i];
-            seat.clients.add(res);
-            seat.goneSince = null;
-            send(i, stateFor(i));
-            if (table.seats[1 - i]) send(1 - i, stateFor(1 - i)); // The opponent sees you back online
-            const keepAlive = setInterval(() => res.write(': ping\n\n'), 15000);
-            req.on('close', () => {
-                clearInterval(keepAlive);
-                if (table.seats[i] !== seat) return;
-                seat.clients.delete(res);
-                if (seat.clients.size === 0) {
-                    seat.goneSince = Date.now();
-                    if (table.seats[1 - i]) send(1 - i, stateFor(1 - i));
+            const waiter = { res, after: Number(url.searchParams.get('after') ?? NaN), timer: null };
+            clearTimeout(seat.awayTimer);
+            seat.waiters.add(waiter);
+            res.on('close', () => {
+                clearTimeout(waiter.timer);
+                seat.waiters.delete(waiter);
+                if (table.seats[i] === seat && seat.waiters.size === 0) {
+                    clearTimeout(seat.awayTimer);
+                    seat.awayTimer = setTimeout(() => setOnline(i, seat, false), AWAY_MS);
                 }
             });
+            setOnline(i, seat, true);
+            const oldest = seat.outbox.length ? seat.outbox[0].seq : seat.seq + 1;
+            if (!Number.isInteger(waiter.after) || waiter.after < oldest - 1 || waiter.after > seat.seq) {
+                // A freshly opened page (or one that missed too much) starts from the table as it is now
+                seat.waiters.delete(waiter);
+                return reply(res, 200, { seq: seat.seq, messages: [stateFor(i)] });
+            }
+            if (waiter.after < seat.seq) return answerPoll(seat, waiter);
+            waiter.timer = setTimeout(() => answerPoll(seat, waiter), POLL_WAIT_MS);
             return;
         }
         if (req.method === 'POST' && url.pathname === '/join') {
@@ -423,7 +449,7 @@ const server = http.createServer(async (req, res) => {
     }
 });
 
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, () => {
     console.log(`Necropolis Casino is running.`);
     console.log(`  On this PC:            http://localhost:${PORT}`);
     for (const nets of Object.values(os.networkInterfaces())) {
