@@ -8,4 +8,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Unity scripts: copied into a Unity project, not built with this console app. -->
+    <Compile Remove="UnityBombMode/**" />
+  </ItemGroup>
+
 </Project>
