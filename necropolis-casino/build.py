@@ -34,9 +34,9 @@ def replace_block(html, name, body):
 
 def card_art_block():
     entries = []
-    for png in sorted((HERE / 'img').glob('*.png')):
-        data = base64.b64encode(png.read_bytes()).decode('ascii')
-        entries.append(f'        {json.dumps(png.stem)}: "data:image/png;base64,{data}"')
+    for picture in sorted((HERE / 'img').glob('*.webp')):
+        data = base64.b64encode(picture.read_bytes()).decode('ascii')
+        entries.append(f'        {json.dumps(picture.stem)}: "data:image/webp;base64,{data}"')
     return '    <script id="card-art">\n    const CARD_ART = {\n' + ',\n'.join(entries) + '\n    };\n    </script>'
 
 
