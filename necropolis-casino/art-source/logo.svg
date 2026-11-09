@@ -1,0 +1,36 @@
+<svg viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg">
+  <!-- Necropolis Casino badge: NECROPOLIS and CASINO around a gold neon ring, a red crowned lich skull in the middle.
+       Text uses the Orbitron font (weight 900). Colours: red #ff4a5e, gold #fff1cc / #ffe3a0, black ground #05050a. -->
+  <defs>
+    <filter id="glow-red" filterUnits="userSpaceOnUse" x="0" y="0" width="600" height="600" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="9" result="w"/><feFlood flood-color="#ff1f3d" flood-opacity="0.95"/><feComposite in2="w" operator="in" result="wg"/>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2.6" result="n"/><feFlood flood-color="#ff5468"/><feComposite in2="n" operator="in" result="ng"/>
+      <feMerge><feMergeNode in="wg"/><feMergeNode in="ng"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glow-gold" filterUnits="userSpaceOnUse" x="0" y="0" width="600" height="600" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8" result="w"/><feFlood flood-color="#ffb21f" flood-opacity="0.85"/><feComposite in2="w" operator="in" result="wg"/>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2.2" result="n"/><feFlood flood-color="#ffd36b"/><feComposite in2="n" operator="in" result="ng"/>
+      <feMerge><feMergeNode in="wg"/><feMergeNode in="ng"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <path id="arc-top" d="M 98 300 A 202 202 0 0 1 502 300"/>
+    <path id="arc-bottom" d="M 70 300 A 230 230 0 0 0 530 300"/>
+    <path id="crown" d="M -46 -70 L -46 -100 L -24 -82 L 0 -112 L 24 -82 L 46 -100 L 46 -70 Z"/>
+    <path id="skull" d="M 0 -66 C 40 -66 60 -40 60 -4 C 60 22 46 36 38 46 L 38 70 L -38 70 L -38 46 C -46 36 -60 22 -60 -4 C -60 -40 -40 -66 0 -66 Z"/>
+    <path id="eyes" d="M -42 -8 Q -24 -26 -6 -8 Q -20 12 -40 6 Z M 42 -8 Q 24 -26 6 -8 Q 20 12 40 6 Z M 0 16 L -9 34 H 9 Z"/>
+    <path id="teeth" d="M -19 50 V 70 M 0 50 V 70 M 19 50 V 70"/>
+  </defs>
+  <rect class="ground" width="600" height="600" fill="#05050a"/>
+  <circle cx="300" cy="300" r="262" fill="none" stroke="#fff1cc" stroke-width="6" filter="url(#glow-gold)"/>
+  <circle cx="300" cy="300" r="176" fill="none" stroke="#ffd9de" stroke-width="3.5" filter="url(#glow-red)"/>
+  <text font-family="Orbitron, sans-serif" font-weight="900" font-size="46" fill="#fff1cc" filter="url(#glow-gold)"><textPath href="#arc-top" startOffset="50%" text-anchor="middle">NECROPOLIS</textPath></text>
+  <text font-family="Orbitron, sans-serif" font-weight="900" font-size="46" fill="#fff1cc" filter="url(#glow-gold)" letter-spacing="10"><textPath href="#arc-bottom" startOffset="50%" text-anchor="middle">CASINO</textPath></text>
+  <g fill="#fff1cc" filter="url(#glow-gold)"><path d="M 66 300 l 10 -10 l 10 10 l -10 10 Z M 514 300 l 10 -10 l 10 10 l -10 10 Z"/></g>
+  <g filter="url(#glow-red)">
+    <g transform="translate(300 318) scale(1.18)">
+      <use href="#skull" fill="#ff4a5e"/>
+      <use href="#crown" fill="#ffe3a0"/>
+      <use href="#eyes" fill="#05050a" data-bw="paper"/>
+      <use href="#teeth" fill="none" stroke="#05050a" stroke-width="4" data-bw="paper-stroke"/>
+    </g>
+  </g>
+</svg>
