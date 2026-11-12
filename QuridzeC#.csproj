@@ -8,4 +8,11 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <!-- The web shop in KumoThreads/ is its own project; keep its files out of this console app. -->
+  <ItemGroup>
+    <Compile Remove="KumoThreads/**" />
+    <Content Remove="KumoThreads/**" />
+    <None Remove="KumoThreads/**" />
+  </ItemGroup>
+
 </Project>
