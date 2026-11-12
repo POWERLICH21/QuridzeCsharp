@@ -54,6 +54,11 @@ public static class Seed
     {
         db.Database.EnsureCreated();
 
+        // Databases created before product photos existed do not have the ImageUrl column yet.
+        var hasImageColumn = db.Database.SqlQueryRaw<int>(
+            "SELECT COUNT(*) AS Value FROM pragma_table_info('Products') WHERE name = 'ImageUrl'").AsEnumerable().First() > 0;
+        if (!hasImageColumn) db.Database.ExecuteSqlRaw("ALTER TABLE Products ADD COLUMN ImageUrl TEXT NULL");
+
         if (!db.Products.Any())
         {
             var day = 0;

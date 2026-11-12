@@ -19,6 +19,7 @@ public class Product
     public bool IsNew { get; set; }
     public bool IsTrending { get; set; }
     public int Stock { get; set; }
+    public string? ImageUrl { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
@@ -45,7 +46,7 @@ public class Order
     public int SubtotalCents { get; set; }
     public int ShippingCents { get; set; }
     public int TotalCents { get; set; }
-    public string Status { get; set; } = "Placed";
+    public string Status { get; set; } = "Pre-ordered";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public List<OrderItem> Items { get; set; } = new();
 }

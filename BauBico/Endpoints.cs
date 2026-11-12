@@ -21,7 +21,7 @@ public record ProductInput(string? Name, string? Description, string? Category, 
 
 public static partial class ShopApi
 {
-    private static readonly string[] Statuses = { "Placed", "Processing", "Shipped", "Delivered", "Cancelled" };
+    private static readonly string[] Statuses = { "Pre-ordered", "Confirmed", "In production", "Shipped", "Delivered", "Cancelled" };
     private static readonly string[] Motifs = { "cloud", "wave", "star", "bolt", "leaf", "ring", "flame", "snow" };
     private static readonly PasswordHasher<User> Hasher = new();
 
@@ -61,7 +61,9 @@ public static partial class ShopApi
         var freeFrom = shopCfg.GetValue("FreeShippingFromCents", 7500);
         var shipping = shopCfg.GetValue("ShippingCents", 695);
 
-        api.MapGet("/config", () => new { freeShippingFromCents = freeFrom, shippingCents = shipping });
+        var shipsIn = shopCfg.GetValue("PreOrderShipsIn", "4-6 weeks");
+
+        api.MapGet("/config", () => new { freeShippingFromCents = freeFrom, shippingCents = shipping, preOrderShipsIn = shipsIn });
 
         // ---------- Catalogue ----------
         api.MapGet("/categories", async (ShopDb db) => new
@@ -175,7 +177,7 @@ public static partial class ShopApi
             if (order.Name.Length < 2 || order.Address.Length < 4 || order.City.Length < 2 || order.Country.Length < 2 || order.Zip.Length < 2)
                 return Bad("Please fill in all shipping details.");
             if (!IsEmail(order.Email)) return Bad("Please enter a valid email address.");
-            if (req.Items is null || req.Items.Count == 0) return Bad("Your cart is empty.");
+            if (req.Items is null || req.Items.Count == 0) return Bad("Your pre-order list is empty.");
             if (req.Items.Count > 50) return Bad("Too many items in one order.");
 
             // Prices and stock always come from the database, never from the browser.
@@ -187,7 +189,7 @@ public static partial class ShopApi
                 var p = await db.Products.FirstOrDefaultAsync(x => x.Id == group.Key.ProductId);
                 if (p is null) return Bad("A product in your cart is no longer available.");
                 if (!p.Sizes.Split(',').Contains(group.Key.Size)) return Bad($"Size {group.Key.Size} is not available for {p.Name}.");
-                if (p.Stock < qty) return Bad($"Only {p.Stock} left of {p.Name}.");
+                if (p.Stock < qty) return Bad(p.Stock == 0 ? $"Pre-orders are closed for {p.Name}." : $"Only {p.Stock} pre-order slots left for {p.Name}.");
                 p.Stock -= qty;
                 order.Items.Add(new OrderItem { ProductId = p.Id, Name = p.Name, Size = group.Key.Size, Qty = qty, UnitPriceCents = p.PriceCents });
             }
@@ -291,14 +293,65 @@ public static partial class ShopApi
             return Results.Ok(p);
         });
 
-        admin.MapDelete("/products/{id:int}", async (ShopDb db, int id) =>
+        // Product photo upload: one JPG, PNG or WebP per product, stored in wwwroot/uploads.
+        admin.MapPost("/products/{id:int}/image", async (ShopDb db, IWebHostEnvironment env, HttpRequest req, int id) =>
         {
             var p = await db.Products.FindAsync(id);
             if (p is null) return Results.NotFound();
+            if (!req.HasFormContentType) return Bad("Please choose an image file.");
+            var file = (await req.ReadFormAsync()).Files.FirstOrDefault();
+            if (file is null || file.Length == 0) return Bad("Please choose an image file.");
+            if (file.Length > 5 * 1024 * 1024) return Bad("The photo is too large. The limit is 5 MB.");
+
+            // Decide the type from the file's first bytes, not from its name.
+            await using var input = file.OpenReadStream();
+            var head = new byte[12];
+            var read = await input.ReadAtLeastAsync(head, 12, throwOnEndOfStream: false);
+            var ext = read >= 3 && head[0] == 0xFF && head[1] == 0xD8 && head[2] == 0xFF ? ".jpg"
+                : read >= 4 && head[0] == 0x89 && head[1] == 0x50 && head[2] == 0x4E && head[3] == 0x47 ? ".png"
+                : read >= 12 && head[0] == 'R' && head[1] == 'I' && head[2] == 'F' && head[3] == 'F' && head[8] == 'W' && head[9] == 'E' && head[10] == 'B' && head[11] == 'P' ? ".webp"
+                : null;
+            if (ext is null) return Bad("Only JPG, PNG or WebP photos are supported.");
+
+            var dir = Path.Combine(env.WebRootPath, "uploads");
+            Directory.CreateDirectory(dir);
+            var name = $"{Guid.NewGuid():N}{ext}";
+            input.Position = 0;
+            await using (var output = File.Create(Path.Combine(dir, name)))
+                await input.CopyToAsync(output);
+
+            DeleteImageFile(env, p.ImageUrl);
+            p.ImageUrl = "uploads/" + name;
+            await db.SaveChangesAsync();
+            return Results.Ok(p);
+        });
+
+        admin.MapDelete("/products/{id:int}/image", async (ShopDb db, IWebHostEnvironment env, int id) =>
+        {
+            var p = await db.Products.FindAsync(id);
+            if (p is null) return Results.NotFound();
+            DeleteImageFile(env, p.ImageUrl);
+            p.ImageUrl = null;
+            await db.SaveChangesAsync();
+            return Results.Ok(p);
+        });
+
+        admin.MapDelete("/products/{id:int}", async (ShopDb db, IWebHostEnvironment env, int id) =>
+        {
+            var p = await db.Products.FindAsync(id);
+            if (p is null) return Results.NotFound();
+            DeleteImageFile(env, p.ImageUrl);
             db.Products.Remove(p);
             await db.SaveChangesAsync();
             return Results.Ok(new { ok = true });
         });
+    }
+
+    private static void DeleteImageFile(IWebHostEnvironment env, string? imageUrl)
+    {
+        if (imageUrl is null || !imageUrl.StartsWith("uploads/")) return;
+        var path = Path.Combine(env.WebRootPath, "uploads", Path.GetFileName(imageUrl));
+        if (File.Exists(path)) File.Delete(path);
     }
 
     private static string? Apply(Product p, ProductInput i)

@@ -58,6 +58,12 @@ main { padding: 28px 0 56px; min-height: 55vh; }
 .hero .btn.alt { background: var(--paper); color: var(--ink); } .hero .btn.alt:hover, .hero .btn.ghost:hover { background: #fff; color: var(--ink); }
 .script { font-family: var(--script); font-style: italic; font-size: 1.35rem; }
 
+.eyebrow { display: inline-block; background: var(--paper); color: var(--ink); font-weight: 800; font-size: .75rem; letter-spacing: .12em; text-transform: uppercase; padding: 5px 12px; border-radius: 999px; margin-bottom: 14px; }
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.step { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px; }
+.step i { font-family: var(--display); font-style: normal; font-size: 1.6rem; display: block; margin-bottom: 8px; }
+.step b { display: block; font-family: var(--display); font-weight: 400; font-size: .85rem; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 6px; }
+.preorder-note { background: var(--card); border: 1px solid var(--line); border-left: 5px solid var(--ink); border-radius: 10px; padding: 10px 14px; font-size: .92rem; }
 .section-head { display: flex; justify-content: space-between; align-items: baseline; margin: 44px 0 16px; gap: 12px; }
 .section-head h2 { margin: 0; }
 .section-head h2::after { content: ""; display: block; width: 100%; height: 9px; margin-top: 6px; background: repeating-linear-gradient(var(--ink) 0 2px, transparent 2px 3.5px); }
@@ -73,6 +79,9 @@ main { padding: 28px 0 56px; min-height: 55vh; }
 .card:hover { box-shadow: 0 10px 24px rgba(20,20,20,.12); }
 .art { aspect-ratio: 5 / 6; background: #f5e6e0; display: grid; place-items: center; }
 .art svg { width: 86%; height: 86%; }
+.art { overflow: hidden; } .art img { width: 100%; height: 100%; object-fit: cover; }
+.art.thumb { width: 56px; aspect-ratio: 1; border-radius: 8px; }
+.photo-row { display: flex; align-items: center; gap: 12px; }
 .card-body { padding: 12px 14px 16px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .card-body h3 { font-family: inherit; text-transform: none; letter-spacing: 0; font-size: .98rem; margin: 0; }
 .card-cat { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
