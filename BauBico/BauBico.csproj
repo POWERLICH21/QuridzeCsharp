@@ -5,7 +5,7 @@
     <RollForward>Major</RollForward>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>KumoThreads</RootNamespace>
+    <RootNamespace>BauBico</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

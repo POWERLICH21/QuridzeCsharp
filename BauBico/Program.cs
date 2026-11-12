@@ -1,5 +1,5 @@
 using System.Threading.RateLimiting;
-using KumoThreads;
+using BauBico;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,7 +11,7 @@ builder.Services.AddDbContext<ShopDb>(o =>
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(o =>
     {
-        o.Cookie.Name = "kumo_auth";
+        o.Cookie.Name = "baubico_auth";
         o.Cookie.HttpOnly = true;
         o.Cookie.SameSite = SameSiteMode.Strict;
         o.ExpireTimeSpan = TimeSpan.FromDays(14);

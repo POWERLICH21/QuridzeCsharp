@@ -1,11 +1,11 @@
-# Kumo Threads
+# BauBico
 
 A demo online clothing shop: ASP.NET Core 8 minimal API + EF Core (SQLite) backend, and a plain HTML/CSS/JavaScript storefront served from `wwwroot`.
 
 ## Run
 
 ```bash
-cd KumoThreads
+cd BauBico
 dotnet run
 ```
 
@@ -25,7 +25,7 @@ Then open http://localhost:5080. The SQLite database `shop.db` is created and fi
 
 The admin user is created at start-up from the `Admin:Email` and `Admin:Password` settings.
 For local development these are in `appsettings.Development.json`
-(`admin@kumothreads.local` / `ChangeMe!123`). Change them before using the app anywhere else,
+(`admin@baubico.local` / `ChangeMe!123`). Change them before using the app anywhere else,
 for example with the environment variables `Admin__Email` and `Admin__Password`.
 
 ## Notes

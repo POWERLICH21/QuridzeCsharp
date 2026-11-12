@@ -1,4 +1,4 @@
-// Kumo Threads storefront: a small hash-routed single page app talking to the /api backend.
+// BauBico storefront: a small hash-routed single page app talking to the /api backend.
 (() => {
   const $ = (s, root = document) => root.querySelector(s);
   const view = $('#view');
@@ -11,8 +11,8 @@
     user: null,
     config: { freeShippingFromCents: 7500, shippingCents: 695 },
     cats: { categories: [], collections: [] },
-    cart: load('kumo_cart', []),
-    wishlist: load('kumo_wishlist', []),
+    cart: load('baubico_cart', []),
+    wishlist: load('baubico_wishlist', []),
   };
 
   async function api(path, options = {}) {
@@ -65,7 +65,7 @@
     const spot = kind === 'shorts' ? 'translate(98 215) scale(.55)' : kind === 'pants' ? 'translate(108 240) scale(.5)' : 'translate(150 195) scale(1.15)';
     return `<svg viewBox="0 0 300 360" role="img" aria-label="${esc(p.name)}">
       <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${esc(p.colorA)}"/><stop offset=".72" stop-color="${esc(p.colorA)}"/><stop offset="1" stop-color="${esc(p.colorB)}"/></linearGradient></defs>
-      <path d="${SHAPES[kind]}" fill="url(#${id})" stroke="rgba(27,23,64,.55)" stroke-width="3" stroke-linejoin="round"/>
+      <path d="${SHAPES[kind]}" fill="url(#${id})" stroke="rgba(20,20,20,.55)" stroke-width="3" stroke-linejoin="round"/>
       <g transform="${spot}" fill="${esc(p.colorB)}" color="${esc(p.colorB)}">${MOTIFS[p.motif] || MOTIFS.cloud}</g>
     </svg>`;
   }
@@ -99,7 +99,7 @@
   const shippingFor = sub => (sub === 0 || sub >= state.config.freeShippingFromCents ? 0 : state.config.shippingCents);
 
   function cartChanged() {
-    save('kumo_cart', state.cart);
+    save('baubico_cart', state.cart);
     $('#cart-count').textContent = cartCount();
     if (!$('#drawer').hidden) renderDrawer();
     if (route().path === '/cart') render();
@@ -141,9 +141,9 @@
       const [trending, latest] = await Promise.all([api('/products?trending=1&pageSize=8'), api('/products?isNew=1&pageSize=8')]);
       const heroArt = trending.items.slice(0, 3).map(p => `<a class="art" href="#/product/${esc(p.slug)}">${art(p)}</a>`).join('');
       const tiles = state.cats.categories.map(c => {
-        const sample = [...trending.items, ...latest.items].find(p => p.category === c.name) || { category: c.name, name: c.name, colorA: '#1b1740', colorB: '#ff3d6e', motif: 'cloud' };
+        const sample = [...trending.items, ...latest.items].find(p => p.category === c.name) || { category: c.name, name: c.name, colorA: '#141414', colorB: '#f0dcd6', motif: 'cloud' };
         return `<a class="tile" href="#/shop?category=${encodeURIComponent(c.name)}"><div class="art">${art(sample)}</div><span>${esc(c.name)}</span></a>`;
-      }).join('') + `<a class="tile" href="#/shop?sale=1"><div class="art">${art({ category: 'Shirts', name: 'Sale', colorA: '#ff3d6e', colorB: '#ffc93c', motif: 'star' })}</div><span>Sale</span></a>`;
+      }).join('') + `<a class="tile" href="#/shop?sale=1"><div class="art">${art({ category: 'Shirts', name: 'Sale', colorA: '#b23a2a', colorB: '#f0dcd6', motif: 'star' })}</div><span>Sale</span></a>`;
       return `<section class="hero">
           <div><h1>Wear the <em>story</em>.<br>Not the logo.</h1>
             <p>Original anime-inspired hoodies, cloak coats, jerseys and gym wear. Designed in-house and printed in small batches.</p>
@@ -241,7 +241,7 @@
 
     async '/track'() {
       return `<h1>Track your order</h1><div class="two"><form class="form panel" data-form="track">
-        <label>Order number <input class="field" name="number" placeholder="KT-XXXXXXXXXX" required></label>
+        <label>Order number <input class="field" name="number" placeholder="BB-XXXXXXXXXX" required></label>
         <label>Email used for the order <input class="field" type="email" name="email" required></label>
         <button class="btn">Track</button><p class="error" data-msg></p></form><div id="track-result"></div></div>`;
     },
@@ -273,7 +273,7 @@
     },
 
     async '/about'() {
-      return `<div class="prose"><h1>About us</h1><p>Kumo Threads makes original, anime-inspired clothing. Every pattern is drawn by our own small team, then printed to order so nothing sits in a warehouse.</p>
+      return `<div class="prose"><h1>About us</h1><p class="script">For the story you wear.</p><p>BauBico makes original, anime-inspired clothing. Every pattern is drawn by our own small team, then printed to order so nothing sits in a warehouse.</p>
         <p>We started with one cloud-print hoodie and now make cloak coats, jerseys, gym wear and seasonal knitwear.</p><a class="btn" href="#/shop">Browse the shop</a></div>`;
     },
     async '/faq'() {
@@ -324,7 +324,7 @@
   };
 
   function productForm(p) {
-    const v = p || { name: '', description: '', category: '', collection: '', priceCents: 0, compareAtCents: null, sizes: 'S,M,L,XL', colorA: '#1b1740', colorB: '#ff3d6e', motif: 'cloud', isNew: true, isTrending: false, stock: 20 };
+    const v = p || { name: '', description: '', category: '', collection: '', priceCents: 0, compareAtCents: null, sizes: 'S,M,L,XL', colorA: '#141414', colorB: '#f0dcd6', motif: 'cloud', isNew: true, isTrending: false, stock: 20 };
     return `<form class="form panel" data-form="product" data-id="${p ? p.id : ''}"><h3>${p ? 'Edit product' : 'Add product'}</h3>
       <label>Name <input class="field" name="name" required value="${esc(v.name)}"></label>
       <div class="row"><label>Category <input class="field" name="category" required value="${esc(v.category)}"></label><label>Collection <input class="field" name="collection" value="${esc(v.collection)}"></label></div>
@@ -384,7 +384,7 @@
     if (act === 'wish') {
       const id = Number(el.dataset.id);
       state.wishlist = state.wishlist.includes(id) ? state.wishlist.filter(x => x !== id) : [...state.wishlist, id];
-      save('kumo_wishlist', state.wishlist);
+      save('baubico_wishlist', state.wishlist);
       toast(state.wishlist.includes(id) ? 'Saved to wishlist' : 'Removed from wishlist');
       render();
     } else if (act === 'size') {
@@ -434,7 +434,7 @@
     async track(d) { const o = await api('/orders/track' + qs(d)); $('#track-result').innerHTML = orderCard(o); },
     async order(d) {
       const o = await api('/orders', { method: 'POST', body: { ...d, items: state.cart.map(i => ({ productId: i.productId, size: i.size, qty: i.qty })) } });
-      state.cart = []; save('kumo_cart', state.cart); $('#cart-count').textContent = 0;
+      state.cart = []; save('baubico_cart', state.cart); $('#cart-count').textContent = 0;
       view.innerHTML = `<h1>Thank you!</h1><p class="success">Your order ${esc(o.number)} has been placed.</p>
         <p class="muted">Keep the order number: you can follow the order on the <a class="link" href="#/track">Track order</a> page.</p>${orderCard(o)}<a class="btn" href="#/shop">Continue shopping</a>`;
       window.scrollTo(0, 0);

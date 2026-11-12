@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "KumoThreads": {
+    "BauBico": {
       "commandName": "Project",
       "launchBrowser": true,
       "applicationUrl": "http://localhost:5080",

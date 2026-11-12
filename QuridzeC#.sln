@@ -5,7 +5,7 @@ VisualStudioVersion = 17.13.35931.197 d17.13
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuridzeC#", "QuridzeC#\QuridzeC#.csproj", "{AB63079A-ABEE-4472-A37F-CF63A59F08D3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KumoThreads", "KumoThreads\KumoThreads.csproj", "{15DB6AAF-D049-46AE-8B9E-D8F655052F48}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BauBico", "BauBico\BauBico.csproj", "{15DB6AAF-D049-46AE-8B9E-D8F655052F48}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

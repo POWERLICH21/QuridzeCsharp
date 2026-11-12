@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace KumoThreads;
+namespace BauBico;
 
 public class Product
 {

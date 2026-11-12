@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
-namespace KumoThreads;
+namespace BauBico;
 
 public record RegisterRequest(string? Name, string? Email, string? Password);
 public record LoginRequest(string? Email, string? Password);
@@ -194,7 +194,7 @@ public static partial class ShopApi
             order.SubtotalCents = order.Items.Sum(i => i.Qty * i.UnitPriceCents);
             order.ShippingCents = order.SubtotalCents >= freeFrom ? 0 : shipping;
             order.TotalCents = order.SubtotalCents + order.ShippingCents;
-            order.Number = "KT-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(5));
+            order.Number = "BB-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(5));
             db.Orders.Add(order);
             await db.SaveChangesAsync();
             await tx.CommitAsync();
