@@ -56,13 +56,13 @@ class Program
 
 A website where a person signs in and tracks their subscriptions: what they pay per month and per year, and when each one renews.
 
-- `server/` — the web app (ASP.NET Core 8, SQLite database). The pages themselves are in `server/wwwroot/`.
+- `server/` — the web app (ASP.NET Core 10, SQLite database). The pages themselves are in `server/wwwroot/`.
 - `server.tests/` — automated tests for the server.
 - `docs/screenshots/` — pictures of the design.
 
 ## Run it
 
-Requires the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 
 ```bash
 cd server

@@ -1,8 +1,10 @@
 # How to run the Allsubs demo on your computer
 
-## 1. Install .NET 8 (one time)
+## 1. Install .NET 10 (one time)
 
-Download and install the **.NET 8 SDK**: https://dotnet.microsoft.com/download/dotnet/8.0
+Download and install the **.NET 10 SDK**: https://dotnet.microsoft.com/download/dotnet/10.0
+
+(.NET 11 should also work, but the site has only been tested on .NET 10.)
 
 To check it worked, open a terminal (on Windows: Command Prompt) and run:
 
@@ -10,7 +12,7 @@ To check it worked, open a terminal (on Windows: Command Prompt) and run:
 dotnet --version
 ```
 
-It should print a number starting with `8.` or higher.
+It should print a number starting with `10.` or higher.
 
 ## 2. Get the code
 
