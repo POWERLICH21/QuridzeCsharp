@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Allsubs — every subscription in one account</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============ AUTH (signed out) ============ -->
+<main id="auth" class="auth" hidden>
+  <section class="auth-pitch">
+    <div class="brand"><span class="brand-mark">A</span>Allsubs</div>
+    <h1>Every subscription you pay for, in one account.</h1>
+    <p class="lead">Streaming, music, software, gym, cloud storage — add them once and see what you
+      spend, what renews next, and what you forgot you were paying for.</p>
+    <ul class="pitch-list">
+      <li><b>One total.</b> Monthly and yearly spend, converted to your currency.</li>
+      <li><b>No surprise charges.</b> A calendar of every upcoming renewal.</li>
+      <li><b>Works anywhere.</b> Track subscriptions billed in any currency.</li>
+    </ul>
+  </section>
+
+  <section class="auth-card" aria-label="Account">
+    <div class="tabs" role="tablist">
+      <button role="tab" class="tab is-active" data-auth-tab="signin" aria-selected="true">Sign in</button>
+      <button role="tab" class="tab" data-auth-tab="signup" aria-selected="false">Create account</button>
+    </div>
+
+    <form id="auth-form" novalidate>
+      <label class="field" id="name-field" hidden>
+        <span>Name</span>
+        <input name="name" autocomplete="name" placeholder="Your name">
+      </label>
+      <label class="field">
+        <span>Email</span>
+        <input name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input name="password" type="password" autocomplete="current-password" placeholder="At least 6 characters" required minlength="6">
+      </label>
+      <p class="form-error" id="auth-error" role="alert" hidden></p>
+      <button class="btn btn-primary btn-block" type="submit" id="auth-submit">Sign in</button>
+    </form>
+
+    <div class="divider"><span>or</span></div>
+    <button class="btn btn-block" id="demo-btn" type="button">Explore with sample data</button>
+    <p class="fineprint">Front-end preview: accounts are stored only in this browser.</p>
+  </section>
+</main>
+
+<!-- ============ APP (signed in) ============ -->
+<div id="app" class="app" hidden>
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">A</span>Allsubs</div>
+    <nav class="nav" aria-label="Main">
+      <button class="nav-item is-active" data-view="overview"><span class="nav-ico">◎</span><span>Overview</span></button>
+      <button class="nav-item" data-view="subscriptions"><span class="nav-ico">▤</span><span>Subscriptions</span></button>
+      <button class="nav-item" data-view="calendar"><span class="nav-ico">▦</span><span>Calendar</span></button>
+      <button class="nav-item" data-view="settings"><span class="nav-ico">⚙</span><span>Settings</span></button>
+    </nav>
+    <div class="sidebar-user">
+      <span class="avatar" id="user-avatar"></span>
+      <div class="sidebar-user-text">
+        <div id="user-name" class="truncate"></div>
+        <div id="user-email" class="muted small truncate"></div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <h2 id="view-title">Overview</h2>
+      <button class="btn btn-primary" id="add-btn">+ Add subscription</button>
+    </header>
+
+    <!-- Overview -->
+    <section class="view" id="view-overview">
+      <div class="kpis" id="kpis"></div>
+      <div class="two-col">
+        <div class="card">
+          <div class="card-head"><h3>Upcoming renewals</h3><span class="muted small">Next 30 days</span></div>
+          <ul class="list" id="upcoming"></ul>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Monthly spend by category</h3></div>
+          <div id="by-category" class="bars"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Subscriptions -->
+    <section class="view" id="view-subscriptions" hidden>
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Search subscriptions" aria-label="Search subscriptions">
+        <select id="filter-cat" aria-label="Category"></select>
+        <select id="sort" aria-label="Sort">
+          <option value="next">Sort: next renewal</option>
+          <option value="cost">Sort: highest cost</option>
+          <option value="name">Sort: name</option>
+        </select>
+      </div>
+      <div class="card table-card">
+        <table class="table">
+          <thead><tr><th>Service</th><th>Category</th><th>Billing</th><th>Next renewal</th><th class="num">Price</th><th></th></tr></thead>
+          <tbody id="sub-rows"></tbody>
+        </table>
+        <p class="empty" id="sub-empty" hidden></p>
+      </div>
+    </section>
+
+    <!-- Calendar -->
+    <section class="view" id="view-calendar" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h3 id="cal-title"></h3>
+          <div class="btn-group">
+            <button class="btn btn-sm" id="cal-prev" aria-label="Previous month">‹</button>
+            <button class="btn btn-sm" id="cal-today">Today</button>
+            <button class="btn btn-sm" id="cal-next" aria-label="Next month">›</button>
+          </div>
+        </div>
+        <div class="cal-dow" id="cal-dow"></div>
+        <div class="cal-grid" id="cal-grid"></div>
+        <p class="muted small" id="cal-total"></p>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section class="view" id="view-settings" hidden>
+      <div class="card settings">
+        <h3>Profile</h3>
+        <label class="field"><span>Name</span><input id="set-name"></label>
+        <label class="field"><span>Display currency</span><select id="set-currency"></select></label>
+        <p class="muted small">Totals are converted with fixed sample rates until live rates are connected.</p>
+        <label class="field"><span>Theme</span>
+          <select id="set-theme">
+            <option value="system">Match system</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+      </div>
+      <div class="card settings">
+        <h3>Account</h3>
+        <div class="row-actions">
+          <button class="btn" id="signout-btn">Sign out</button>
+          <button class="btn btn-danger" id="delete-account-btn">Delete account</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ============ Add / edit dialog ============ -->
+<dialog id="sub-dialog">
+  <form id="sub-form" method="dialog" novalidate>
+    <h3 id="sub-dialog-title">Add subscription</h3>
+    <label class="field"><span>Service name</span><input name="name" required placeholder="e.g. Music streaming" list="service-suggestions"></label>
+    <datalist id="service-suggestions"></datalist>
+    <div class="field-row">
+      <label class="field"><span>Price</span><input name="amount" type="number" min="0" step="0.01" required placeholder="0.00"></label>
+      <label class="field"><span>Currency</span><select name="currency"></select></label>
+    </div>
+    <div class="field-row">
+      <label class="field"><span>Billing cycle</span>
+        <select name="cycle">
+          <option value="weekly">Weekly</option>
+          <option value="monthly" selected>Monthly</option>
+          <option value="quarterly">Every 3 months</option>
+          <option value="yearly">Yearly</option>
+        </select>
+      </label>
+      <label class="field"><span>Next renewal</span><input name="next" type="date" required></label>
+    </div>
+    <label class="field"><span>Category</span><select name="category"></select></label>
+    <p class="form-error" id="sub-error" role="alert" hidden></p>
+    <div class="dialog-actions">
+      <button class="btn" type="button" id="sub-cancel">Cancel</button>
+      <button class="btn btn-primary" type="submit">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>
