@@ -235,6 +235,14 @@ dialog::backdrop { background: rgba(10, 12, 16, .5); }
 dialog h3 { margin-bottom: 18px; font-size: 18px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
 
+/* Toast */
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 20;
+  max-width: calc(100vw - 32px); padding: 10px 16px; border-radius: 10px;
+  background: var(--text); color: var(--bg); font-weight: 600; font-size: 14px;
+}
+.btn:disabled { opacity: .6; cursor: default; }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 900px) {
   .auth { grid-template-columns: 1fr; gap: 28px; padding: 28px 18px; }
@@ -253,6 +261,7 @@ dialog h3 { margin-bottom: 18px; font-size: 18px; }
   .nav { grid-template-columns: repeat(4, 1fr); width: 100%; }
   .nav-item { flex-direction: column; gap: 2px; font-size: 11px; padding: 6px 2px; align-items: center; }
   .main { padding: 18px 14px 90px; }
+  .toast { bottom: 84px; }
   .toolbar { grid-template-columns: 1fr 1fr; }
   .toolbar input { grid-column: 1 / -1; }
   /* Table rows become two-line cards: service + price, then renewal + actions */

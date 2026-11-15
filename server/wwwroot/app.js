@@ -1,11 +1,12 @@
-/* Allsubs front-end prototype.
- * Everything lives in localStorage; `store` is the only place that touches it,
- * so it can later be swapped for real API calls without changing the UI code. */
+/* Allsubs front end.
+ * Data access goes through a "backend" object: `remote` talks to the server API,
+ * `demo` keeps the sample-data mode entirely in this browser. */
 (() => {
   'use strict';
 
   // ---------- Reference data ----------
-  // Fixed sample rates (units per 1 USD) until a live-rate backend exists.
+  // Fixed sample rates (units per 1 USD) until live rates are connected.
+  // The currency and cycle lists mirror server/Rules.cs.
   const RATES = { USD: 1, EUR: 0.92, GBP: 0.79, GEL: 2.7, JPY: 150, INR: 84, BRL: 5.6, CAD: 1.38, AUD: 1.52, TRY: 34 };
   const CURRENCIES = Object.keys(RATES);
   const CATEGORIES = ['Streaming', 'Music', 'Software', 'Cloud', 'Gaming', 'News', 'Fitness', 'Other'];
@@ -17,26 +18,58 @@
   };
   const SUGGESTIONS = ['Video streaming', 'Music streaming', 'Cloud storage', 'Design tools', 'Game pass', 'News site', 'Gym membership', 'VPN', 'Password manager'];
 
-  // ---------- Storage ----------
-  const store = {
-    read(key, fallback) {
-      try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
-    },
-    write(key, value) { localStorage.setItem(key, JSON.stringify(value)); },
-    users() { return this.read('allsubs.users', {}); },
-    saveUser(user) { const u = this.users(); u[user.email] = user; this.write('allsubs.users', u); },
-    removeUser(email) {
-      const u = this.users(); delete u[email]; this.write('allsubs.users', u);
-      localStorage.removeItem('allsubs.subs.' + email);
-    },
-    session() { return this.read('allsubs.session', null); },
-    setSession(email) { email ? this.write('allsubs.session', email) : localStorage.removeItem('allsubs.session'); },
-    subs(email) { return this.read('allsubs.subs.' + email, []); },
-    saveSubs(email, subs) { this.write('allsubs.subs.' + email, subs); },
+  // ---------- Backends ----------
+  const api = async (method, path, body) => {
+    let res;
+    try {
+      res = await fetch('/api' + path, {
+        method,
+        headers: body ? { 'Content-Type': 'application/json' } : {},
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    } catch {
+      throw new Error('Cannot reach the server. Check your connection and try again.');
+    }
+    if (res.status === 204) return null;
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      const fallback = res.status === 429 ? 'Too many attempts. Wait a minute and try again.' : 'Something went wrong. Try again.';
+      throw Object.assign(new Error(data?.error ?? fallback), { status: res.status });
+    }
+    return data;
   };
 
-  // Placeholder only: real password handling belongs to the backend.
-  const weakHash = (s) => { let h = 5381; for (const c of s) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return h.toString(36); };
+  const remote = {
+    listSubs: () => api('GET', '/subscriptions'),
+    createSub: (data) => api('POST', '/subscriptions', data),
+    updateSub: (id, data) => api('PUT', '/subscriptions/' + id, data),
+    deleteSub: (id) => api('DELETE', '/subscriptions/' + id),
+    updateUser: (patch) => api('PATCH', '/me', patch),
+    signOut: () => api('POST', '/auth/logout'),
+    deleteAccount: () => api('DELETE', '/me'),
+  };
+
+  // Sample-data mode: same interface, stored in localStorage, never sent to the server.
+  const DEMO_KEY = 'allsubs.demo', DEMO_ON = 'allsubs.demo.active';
+  const demo = {
+    state: null,
+    isActive: () => localStorage.getItem(DEMO_ON) === '1',
+    open() {
+      try { this.state = JSON.parse(localStorage.getItem(DEMO_KEY)); } catch { this.state = null; }
+      this.state ??= { user: { email: 'demo@allsubs.example', name: 'Demo user', currency: 'USD', theme: 'system' }, subs: sampleSubs() };
+      localStorage.setItem(DEMO_ON, '1');
+      this.save();
+      return this.state.user;
+    },
+    save() { localStorage.setItem(DEMO_KEY, JSON.stringify(this.state)); },
+    async listSubs() { return this.state.subs.map((s) => ({ ...s })); },
+    async createSub(data) { const s = { id: crypto.randomUUID(), ...data }; this.state.subs.push(s); this.save(); return { ...s }; },
+    async updateSub(id, data) { const s = Object.assign(this.state.subs.find((x) => x.id === id), data); this.save(); return { ...s }; },
+    async deleteSub(id) { this.state.subs = this.state.subs.filter((x) => x.id !== id); this.save(); },
+    async updateUser(patch) { Object.assign(this.state.user, patch); this.save(); return { ...this.state.user }; },
+    async signOut() { localStorage.removeItem(DEMO_ON); },
+    async deleteAccount() { localStorage.removeItem(DEMO_ON); localStorage.removeItem(DEMO_KEY); },
+  };
 
   // ---------- Date helpers (local dates as YYYY-MM-DD) ----------
   const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -92,6 +125,7 @@
     select.replaceChildren(...values.map((v, i) => el('option', { value: v }, labels[i])));
 
   // ---------- State ----------
+  let backend = remote;
   let user = null;
   let subs = [];
   let view = 'overview';
@@ -99,7 +133,22 @@
   let editingId = null;
   let calMonth = new Date(today().getFullYear(), today().getMonth(), 1);
 
-  const saveSubs = () => { store.saveSubs(user.email, subs); render(); };
+  // ---------- Toast (errors outside of forms) ----------
+  let toastTimer;
+  const toast = (msg) => {
+    const t = $('#toast');
+    t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.hidden = true; }, 5000);
+  };
+  /** Runs a backend action; an expired session returns to sign-in, other failures show a toast. */
+  const run = async (action) => {
+    try { await action(); }
+    catch (e) {
+      if (e.status === 401) { user = null; subs = []; boot(); toast('Your session has ended. Sign in again.'); }
+      else toast(e.message);
+    }
+  };
 
   // ---------- Theme ----------
   const applyTheme = () => {
@@ -125,46 +174,43 @@
 
   const authError = (msg) => { const e = $('#auth-error'); e.textContent = msg; e.hidden = false; };
 
-  const signIn = (account) => {
+  const enter = async (nextBackend, account) => {
+    const list = await nextBackend.listSubs();
+    backend = nextBackend;
+    subs = list;
     user = account;
-    subs = store.subs(user.email);
-    store.setSession(user.email);
     view = 'overview';
     boot();
   };
 
   $$('[data-auth-tab]').forEach((t) => t.addEventListener('click', () => setAuthMode(t.dataset.authTab)));
 
-  $('#auth-form').addEventListener('submit', (e) => {
+  $('#auth-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = e.target;
-    const email = f.email.value.trim().toLowerCase();
+    const email = f.email.value.trim();
     const password = f.password.value;
     if (!/^\S+@\S+\.\S+$/.test(email)) return authError('Enter a valid email address.');
-    if (password.length < 6) return authError('Password must be at least 6 characters.');
-    const existing = store.users()[email];
+    if (authMode === 'signup' && password.length < 8) return authError('Password must be at least 8 characters.');
 
-    if (authMode === 'signup') {
-      if (existing) return authError('An account with this email already exists. Sign in instead.');
-      const account = { email, name: f.name.value.trim() || email.split('@')[0], pass: weakHash(password), currency: 'USD', theme: 'system' };
-      store.saveUser(account);
+    const button = $('#auth-submit');
+    button.disabled = true;
+    try {
+      const account = authMode === 'signup'
+        ? await api('POST', '/auth/register', { name: f.name.value, email, password })
+        : await api('POST', '/auth/login', { email, password });
+      await enter(remote, account);
       f.reset();
-      return signIn(account);
+    } catch (err) {
+      authError(err.message);
+    } finally {
+      button.disabled = false;
     }
-    if (!existing || existing.pass !== weakHash(password)) return authError('Email or password is incorrect.');
-    f.reset();
-    signIn(existing);
   });
 
-  $('#demo-btn').addEventListener('click', () => {
-    const email = 'demo@allsubs.example';
-    const account = store.users()[email] ?? { email, name: 'Demo user', pass: '', currency: 'USD', theme: 'system' };
-    store.saveUser(account);
-    if (!store.subs(email).length) store.saveSubs(email, sampleSubs());
-    signIn(account);
-  });
+  $('#demo-btn').addEventListener('click', () => enter(demo, demo.open()));
 
-  const sampleSubs = () => {
+  function sampleSubs() {
     const t = today();
     const mk = (name, amount, currency, cycle, category, inDays) =>
       ({ id: crypto.randomUUID(), name, amount, currency, cycle, category, next: iso(addDays(t, inDays)), paused: false });
@@ -178,7 +224,7 @@
       mk('Gym membership', 90, 'GEL', 'monthly', 'Fitness', 14),
       mk('Password manager', 35.88, 'USD', 'yearly', 'Software', 120),
     ];
-  };
+  }
 
   // ---------- Navigation ----------
   const TITLES = { overview: 'Overview', subscriptions: 'Subscriptions', calendar: 'Calendar', settings: 'Settings' };
@@ -224,6 +270,8 @@
       )) : [el('p.empty', {}, 'No spend to show yet.')]));
   };
 
+  const replaceSub = (updated) => { subs = subs.map((x) => (x.id === updated.id ? updated : x)); render(); };
+
   const renderSubscriptions = () => {
     const q = $('#search').value.trim().toLowerCase();
     const cat = $('#filter-cat').value;
@@ -248,9 +296,9 @@
         el('td.num', {}, money(s.amount, s.currency),
           s.currency !== cur || s.cycle !== 'monthly' ? el('span.price-sub', {}, `≈ ${money(monthlyIn(s, cur), cur)}/mo`) : null),
         el('td', {}, el('div.row-actions', {},
-          el('button.icon-btn', { onclick: () => { s.paused = !s.paused; saveSubs(); } }, s.paused ? 'Resume' : 'Pause'),
+          el('button.icon-btn', { onclick: () => run(async () => { replaceSub(await backend.updateSub(s.id, { ...s, paused: !s.paused })); }) }, s.paused ? 'Resume' : 'Pause'),
           el('button.icon-btn', { onclick: () => openDialog(s) }, 'Edit'),
-          el('button.icon-btn.danger', { onclick: () => { if (confirm(`Remove "${s.name}"?`)) { subs = subs.filter((x) => x !== s); saveSubs(); } } }, 'Remove'),
+          el('button.icon-btn.danger', { onclick: () => confirm(`Remove "${s.name}"?`) && run(async () => { await backend.deleteSub(s.id); subs = subs.filter((x) => x !== s); render(); }) }, 'Remove'),
         )),
       )));
     const empty = $('#sub-empty');
@@ -322,21 +370,25 @@
   $('#add-btn').addEventListener('click', () => openDialog());
   $('#sub-cancel').addEventListener('click', () => dialog.close());
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    const box = $('#sub-error');
+    const fail = (msg) => { box.textContent = msg; box.hidden = false; };
     const name = form.name.value.trim();
     const amount = Number(form.amount.value);
-    const err = !name ? 'Enter the service name.'
-      : !(form.amount.value !== '' && amount >= 0) ? 'Enter a price of 0 or more.'
-      : !form.next.value ? 'Choose the next renewal date.' : '';
-    if (err) { const box = $('#sub-error'); box.textContent = err; box.hidden = false; return; }
+    if (!name) return fail('Enter the service name.');
+    if (form.amount.value === '' || !(amount >= 0)) return fail('Enter a price of 0 or more.');
+    if (!form.next.value) return fail('Choose the next renewal date.');
 
-    const data = { name, amount, currency: form.currency.value, cycle: form.cycle.value, category: form.category.value, next: form.next.value };
     const existing = subs.find((s) => s.id === editingId);
-    if (existing) Object.assign(existing, data);
-    else subs.push({ id: crypto.randomUUID(), paused: false, ...data });
-    dialog.close();
-    saveSubs();
+    const data = { name, amount, currency: form.currency.value, cycle: form.cycle.value, category: form.category.value, next: form.next.value, paused: existing?.paused ?? false };
+    try {
+      if (existing) replaceSub(await backend.updateSub(existing.id, data));
+      else { subs.push(await backend.createSub(data)); render(); }
+      dialog.close();
+    } catch (err) {
+      if (err.status === 401) { dialog.close(); run(() => { throw err; }); } else fail(err.message);
+    }
   });
 
   // ---------- Toolbar, calendar and settings events ----------
@@ -345,17 +397,16 @@
   $('#cal-next').addEventListener('click', () => { calMonth = addMonths(calMonth, 1); renderCalendar(); });
   $('#cal-today').addEventListener('click', () => { calMonth = new Date(today().getFullYear(), today().getMonth(), 1); renderCalendar(); });
 
-  const updateUser = (patch) => { Object.assign(user, patch); store.saveUser(user); applyTheme(); };
-  $('#set-name').addEventListener('change', (e) => { updateUser({ name: e.target.value.trim() || user.name }); render(); });
+  const updateUser = (patch) => run(async () => { user = await backend.updateUser(patch); applyTheme(); render(); });
+  $('#set-name').addEventListener('change', (e) => { const name = e.target.value.trim(); if (name) updateUser({ name }); else render(); });
   $('#set-currency').addEventListener('change', (e) => updateUser({ currency: e.target.value }));
   $('#set-theme').addEventListener('change', (e) => updateUser({ theme: e.target.value }));
 
-  const signOut = () => { store.setSession(null); user = null; subs = []; boot(); };
-  $('#signout-btn').addEventListener('click', signOut);
+  const leave = (action) => run(async () => { await action(); user = null; subs = []; boot(); });
+  $('#signout-btn').addEventListener('click', () => leave(() => backend.signOut()));
   $('#delete-account-btn').addEventListener('click', () => {
-    if (!confirm('Delete this account and all of its subscriptions from this browser?')) return;
-    store.removeUser(user.email);
-    signOut();
+    const what = backend === demo ? 'Delete the sample data from this browser?' : 'Delete your account and all of its subscriptions? This cannot be undone.';
+    if (confirm(what)) leave(() => backend.deleteAccount());
   });
 
   // ---------- Boot ----------
@@ -373,8 +424,13 @@
   $('#service-suggestions').replaceChildren(...SUGGESTIONS.map((s) => el('option', { value: s })));
   $('#cal-dow').replaceChildren(...['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => el('div', {}, d)));
 
-  const sessionEmail = store.session();
-  user = sessionEmail ? store.users()[sessionEmail] ?? null : null;
-  if (user) subs = store.subs(user.email);
-  boot();
+  // Resume the sample-data mode or an existing server session, otherwise show sign-in.
+  (async () => {
+    try {
+      if (demo.isActive()) await enter(demo, demo.open());
+      else await enter(remote, await api('GET', '/me'));
+    } catch {
+      boot();
+    }
+  })();
 })();

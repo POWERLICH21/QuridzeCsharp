@@ -8,4 +8,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <!-- The web app in server/ is its own project; keep its files out of this one. -->
+  <ItemGroup>
+    <Compile Remove="server/**;server.tests/**" />
+  </ItemGroup>
+
 </Project>

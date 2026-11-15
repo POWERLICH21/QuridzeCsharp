@@ -48,3 +48,31 @@ class Program
 
 
 
+
+
+---
+
+# Allsubs — subscription tracker
+
+A website where a person signs in and tracks their subscriptions: what they pay per month and per year, and when each one renews.
+
+- `server/` — the web app (ASP.NET Core 8, SQLite database). The pages themselves are in `server/wwwroot/`.
+- `server.tests/` — automated tests for the server.
+- `docs/screenshots/` — pictures of the design.
+
+## Run it
+
+Requires the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
+
+```bash
+cd server
+dotnet run
+```
+
+Then open the address it prints (for example http://localhost:5000). The database file `allsubs.db` is created automatically on first start.
+
+## Run the tests
+
+```bash
+dotnet test server.tests
+```

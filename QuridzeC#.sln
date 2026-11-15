@@ -5,6 +5,10 @@ VisualStudioVersion = 17.13.35931.197 d17.13
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuridzeC#", "QuridzeC#\QuridzeC#.csproj", "{AB63079A-ABEE-4472-A37F-CF63A59F08D3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Allsubs.Server", "server\Allsubs.Server.csproj", "{7181ABF3-8148-45B5-A77D-E5ED133CA4FE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Allsubs.Server.Tests", "server.tests\Allsubs.Server.Tests.csproj", "{D9DEBE73-BF56-4193-A1FF-7AEC28D705F6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +19,14 @@ Global
 		{AB63079A-ABEE-4472-A37F-CF63A59F08D3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AB63079A-ABEE-4472-A37F-CF63A59F08D3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AB63079A-ABEE-4472-A37F-CF63A59F08D3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7181ABF3-8148-45B5-A77D-E5ED133CA4FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7181ABF3-8148-45B5-A77D-E5ED133CA4FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7181ABF3-8148-45B5-A77D-E5ED133CA4FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7181ABF3-8148-45B5-A77D-E5ED133CA4FE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D9DEBE73-BF56-4193-A1FF-7AEC28D705F6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D9DEBE73-BF56-4193-A1FF-7AEC28D705F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D9DEBE73-BF56-4193-A1FF-7AEC28D705F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D9DEBE73-BF56-4193-A1FF-7AEC28D705F6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

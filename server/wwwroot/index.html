@@ -39,7 +39,7 @@
       </label>
       <label class="field">
         <span>Password</span>
-        <input name="password" type="password" autocomplete="current-password" placeholder="At least 6 characters" required minlength="6">
+        <input name="password" type="password" autocomplete="current-password" placeholder="At least 8 characters" required>
       </label>
       <p class="form-error" id="auth-error" role="alert" hidden></p>
       <button class="btn btn-primary btn-block" type="submit" id="auth-submit">Sign in</button>
@@ -47,7 +47,7 @@
 
     <div class="divider"><span>or</span></div>
     <button class="btn btn-block" id="demo-btn" type="button">Explore with sample data</button>
-    <p class="fineprint">Front-end preview: accounts are stored only in this browser.</p>
+    <p class="fineprint">Sample data stays in this browser and is never uploaded.</p>
   </section>
 </main>
 
@@ -183,6 +183,8 @@
     </div>
   </form>
 </dialog>
+
+<div id="toast" class="toast" role="status" hidden></div>
 
 <script src="app.js"></script>
 </body>
