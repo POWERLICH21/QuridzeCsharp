@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Subfuse — design options</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 32px; background: #e9ebef; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #14171c; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 0 0 12px; font-weight: 700; }
+  .sub { color: #5b6472; margin: 0 0 28px; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; max-width: 1240px; }
+  .note { color: #5b6472; font-size: 13px; margin: 10px 2px 0; }
+
+  /* ---- One mock of the product, restyled by each theme's variables ---- */
+  .mock { background: var(--bg); color: var(--text); font-family: var(--font); border-radius: 18px; padding: 26px; border: 1px solid rgba(0,0,0,.08); overflow: hidden; }
+  .mock-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
+  .mock .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 20px; letter-spacing: var(--track, -.03em); font-family: var(--head-font, var(--font)); }
+  .mock .brand svg { width: 28px; height: 28px; }
+  .mock .cta { background: var(--accent); color: var(--accent-ink); border: var(--btn-border, 0); border-radius: var(--btn-radius); padding: 8px 14px; font: inherit; font-weight: 700; font-size: 13px; }
+  .mock h3 { font-family: var(--head-font, var(--font)); font-size: 27px; line-height: 1.12; margin: 0 0 18px; letter-spacing: var(--track, -.02em); font-weight: var(--head-weight, 700); }
+  .hero { background: var(--hero-bg); color: var(--hero-ink); border-radius: var(--radius); padding: 16px 18px; display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; border: var(--card-border); box-shadow: var(--shadow, none); }
+  .hero small { display: block; opacity: .8; font-size: 12px; margin-bottom: 2px; }
+  .hero b { font-size: 30px; letter-spacing: -.02em; font-family: var(--num-font, inherit); }
+  .hero span { font-size: 12px; opacity: .8; }
+  .rows { background: var(--surface); border: var(--card-border); border-radius: var(--radius); padding: 4px 16px; box-shadow: var(--shadow, none); backdrop-filter: var(--blur, none); }
+  .row { display: grid; grid-template-columns: auto 1fr auto auto; gap: 12px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .row:first-child { border-top: 0; }
+  .row i { width: 28px; height: 28px; border-radius: var(--chip-radius); background: var(--chip); color: var(--chip-ink); display: grid; place-items: center; font-style: normal; font-weight: 700; font-size: 12px; }
+  .row em { font-style: normal; font-size: 11px; padding: 2px 8px; border-radius: 99px; background: var(--pill); color: var(--pill-ink); font-weight: 600; }
+  .row b { font-family: var(--num-font, inherit); font-variant-numeric: tabular-nums; }
+
+  /* A — Indigo Clean (current) */
+  .t-indigo { --bg:#f6f7f9; --surface:#fff; --text:#14171c; --font:system-ui,sans-serif; --accent:#4f46e5; --accent-ink:#fff; --hero-bg:#4f46e5; --hero-ink:#fff; --radius:12px; --btn-radius:8px; --card-border:1px solid #e2e5ea; --line:#e9ebef; --chip:#e9eaff; --chip-ink:#3730a3; --chip-radius:8px; --pill:#fff4de; --pill-ink:#8a5a00; --shadow:0 4px 16px rgba(16,24,40,.05); }
+  /* B — Midnight Terminal */
+  .t-midnight { --bg:#0b0f14; --surface:#121820; --text:#e6edf3; --font:system-ui,sans-serif; --num-font:ui-monospace,Menlo,Consolas,monospace; --accent:#3ddc97; --accent-ink:#06120c; --hero-bg:#121820; --hero-ink:#3ddc97; --radius:10px; --btn-radius:6px; --card-border:1px solid #223041; --line:#1c2734; --chip:#16241f; --chip-ink:#3ddc97; --chip-radius:6px; --pill:#1c2734; --pill-ink:#9fb1c3; }
+  /* C — Warm Paper */
+  .t-paper { --bg:#f7f1e6; --surface:#fffdf8; --text:#2b2119; --font:Georgia,"Times New Roman",serif; --head-font:Georgia,"Times New Roman",serif; --head-weight:600; --track:-.01em; --accent:#c2552d; --accent-ink:#fffdf8; --hero-bg:#2b2119; --hero-ink:#f7f1e6; --radius:6px; --btn-radius:99px; --card-border:1px solid #e3d8c5; --line:#ece2d1; --chip:#f3dfd3; --chip-ink:#8f3a1b; --chip-radius:99px; --pill:#efe6d6; --pill-ink:#6b5a48; }
+  /* D — Bold Mono */
+  .t-bold { --bg:#fff; --surface:#fff; --text:#000; --font:"Arial Black","Helvetica Neue",Arial,sans-serif; --head-weight:900; --track:-.04em; --accent:#ffe14d; --accent-ink:#000; --btn-border:2px solid #000; --hero-bg:#ffe14d; --hero-ink:#000; --radius:0; --btn-radius:0; --card-border:2px solid #000; --line:#000; --chip:#000; --chip-ink:#ffe14d; --chip-radius:0; --pill:#000; --pill-ink:#fff; --shadow:6px 6px 0 #000; }
+  .t-bold .row { font-family: "Helvetica Neue", Arial, sans-serif; font-weight: 600; }
+  /* E — Soft Gradient */
+  .t-gradient { --bg:linear-gradient(135deg,#7c5cff 0%,#e560a8 55%,#ffb36b 100%); --surface:rgba(255,255,255,.78); --text:#fff; --font:system-ui,sans-serif; --accent:#fff; --accent-ink:#5b2fd6; --hero-bg:rgba(255,255,255,.2); --hero-ink:#fff; --radius:20px; --btn-radius:99px; --card-border:1px solid rgba(255,255,255,.45); --line:rgba(40,20,80,.1); --chip:#efe7ff; --chip-ink:#5b2fd6; --chip-radius:10px; --pill:#ffe6f2; --pill-ink:#a8286b; --blur:blur(12px); }
+  .t-gradient .rows { color: #2a1b4d; }
+  /* F — Forest Calm */
+  .t-forest { --bg:#eef3ee; --surface:#fff; --text:#12261c; --font:system-ui,sans-serif; --accent:#1f7a4d; --accent-ink:#fff; --hero-bg:#12261c; --hero-ink:#d8f3e3; --radius:16px; --btn-radius:12px; --card-border:1px solid #d8e3da; --line:#e6eee8; --chip:#dff1e6; --chip-ink:#1f7a4d; --chip-radius:50%; --pill:#fdf0c8; --pill-ink:#7a5a00; }
+
+  /* ---- Logos ---- */
+  .logos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; max-width: 1240px; }
+  .logo { background: #fff; border-radius: 16px; padding: 22px; border: 1px solid rgba(0,0,0,.08); }
+  .logo .pair { display: flex; align-items: center; gap: 14px; font-weight: 700; font-size: 30px; letter-spacing: -.035em; margin-bottom: 14px; }
+  .logo .pair svg { width: 52px; height: 52px; flex: none; }
+  .logo .sizes { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 10px; background: #14171c; }
+  .logo .sizes svg:nth-child(1) { width: 40px; height: 40px; } .logo .sizes svg:nth-child(2) { width: 24px; height: 24px; } .logo .sizes svg:nth-child(3) { width: 16px; height: 16px; }
+  .logo .sizes span { color: #9aa3b2; font-size: 12px; margin-left: auto; }
+  section { margin-bottom: 44px; }
+</style>
+</head>
+<body>
+
+<h1>Subfuse — design options</h1>
+<p class="sub">Six page styles and six logos. Every style shows the same content, so only the look differs. Any logo can go with any style.</p>
+
+<section id="styles">
+  <div class="grid" id="style-grid"></div>
+</section>
+
+<section id="logos">
+  <h1>Logo options</h1>
+  <p class="sub">Each is shown large with the name, then at app-icon, menu and browser-tab size on a dark background.</p>
+  <div class="logos" id="logo-grid"></div>
+</section>
+
+<script>
+  const LOGOS = {
+    1: { name: '1 · Merge', idea: 'Two circles overlapping: subscriptions fused into one. The current logo.',
+      svg: (c, i) => `<rect width="32" height="32" rx="9" fill="${c}"/><circle cx="12.5" cy="16" r="6.5" fill="${i}" fill-opacity=".6"/><circle cx="19.5" cy="16" r="6.5" fill="${i}" fill-opacity=".6"/>` },
+    2: { name: '2 · Link', idea: 'Two half-rings that lock together and read as a letter S.',
+      svg: (c, i) => `<rect width="32" height="32" rx="9" fill="${c}"/><path d="M20.5 11.5a4.5 4.5 0 0 0-9 0c0 2.5 2 4.5 4.5 4.5s4.5 2 4.5 4.5a4.5 4.5 0 0 1-9 0" fill="none" stroke="${i}" stroke-width="3" stroke-linecap="round"/>` },
+    3: { name: '3 · Converge', idea: 'Three lines joining into one: many payments, one view.',
+      svg: (c, i) => `<rect width="32" height="32" rx="9" fill="${c}"/><path d="M8 9h4c3 0 4 7 7 7h5M8 16h16M8 23h4c3 0 4-7 7-7" fill="none" stroke="${i}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>` },
+    4: { name: '4 · Cycle', idea: 'An open ring with a dot: a payment coming round again on its date.',
+      svg: (c, i) => `<rect width="32" height="32" rx="9" fill="${c}"/><path d="M16 8a8 8 0 1 1-8 8" fill="none" stroke="${i}" stroke-width="2.8" stroke-linecap="round"/><circle cx="10.3" cy="10.3" r="2" fill="${i}"/>` },
+    5: { name: '5 · Stack', idea: 'Cards stacked into one neat pile: every subscription in one place.',
+      svg: (c, i) => `<rect width="32" height="32" rx="9" fill="${c}"/><rect x="8" y="8" width="16" height="5" rx="2.5" fill="${i}" fill-opacity=".45"/><rect x="8" y="13.5" width="16" height="5" rx="2.5" fill="${i}" fill-opacity=".7"/><rect x="8" y="19" width="16" height="5" rx="2.5" fill="${i}"/>` },
+    6: { name: '6 · Monogram', idea: 'A plain lowercase "s" in a circle. The simplest and most classic.',
+      svg: (c, i) => `<circle cx="16" cy="16" r="16" fill="${c}"/><text x="16" y="22.5" text-anchor="middle" font-family="Georgia, serif" font-weight="700" font-size="20" fill="${i}">s</text>` },
+  };
+  const mark = (n, c, i) => `<svg viewBox="0 0 32 32" aria-hidden="true">${LOGOS[n].svg(c, i)}</svg>`;
+
+  const STYLES = [
+    ['t-indigo', 'A · Indigo Clean', 'The current design. Light, calm, familiar for a finance tool.', 1, '#4f46e5', '#fff'],
+    ['t-midnight', 'B · Midnight Terminal', 'Dark with a green accent and code-style numbers. The most "techy".', 4, '#3ddc97', '#06120c'],
+    ['t-paper', 'C · Warm Paper', 'Cream background, serif type, terracotta accent. Friendly and personal.', 6, '#c2552d', '#fffdf8'],
+    ['t-bold', 'D · Bold Mono', 'Black, white and yellow with hard edges. Loud and very memorable.', 5, '#000', '#ffe14d'],
+    ['t-gradient', 'E · Soft Gradient', 'Colourful gradient with frosted cards. Playful, consumer-app feel.', 2, '#fff', '#5b2fd6'],
+    ['t-forest', 'F · Forest Calm', 'Green and soft. Suggests saving money and being in control.', 3, '#1f7a4d', '#fff'],
+  ];
+  const rows = [['V', 'Video streaming', 'in 2 days', '$15.49'], ['M', 'Music streaming', 'in 6 days', '€10.99'], ['C', 'Cloud storage', 'in 19 days', '$99.99']];
+
+  document.getElementById('style-grid').innerHTML = STYLES.map(([cls, name, note, logo, c, i]) => `
+    <div class="style" id="${cls}">
+      <h2>${name}</h2>
+      <div class="mock ${cls}">
+        <div class="mock-head"><div class="brand">${mark(logo, c, i)}subfuse</div><button class="cta">+ Add subscription</button></div>
+        <h3>Every subscription, fused into one view.</h3>
+        <div class="hero"><div><small>Monthly spend</small><b>$132.02</b></div><span>8 active</span></div>
+        <div class="rows">${rows.map((r) => `<div class="row"><i>${r[0]}</i><span>${r[1]}</span><em>${r[2]}</em><b>${r[3]}</b></div>`).join('')}</div>
+      </div>
+      <p class="note">${note}</p>
+    </div>`).join('');
+
+  document.getElementById('logo-grid').innerHTML = Object.keys(LOGOS).map((n) => `
+    <div class="logo">
+      <h2>${LOGOS[n].name}</h2>
+      <div class="pair">${mark(n, '#4f46e5', '#fff')}subfuse</div>
+      <div class="sizes">${mark(n, '#4f46e5', '#fff').repeat(3)}<span>40 · 24 · 16 px</span></div>
+      <p class="note">${LOGOS[n].idea}</p>
+    </div>`).join('');
+</script>
+</body>
+</html>
