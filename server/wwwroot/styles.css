@@ -90,11 +90,9 @@ input:focus-visible, select:focus-visible, button:focus-visible {
 .icon-btn:hover { background: var(--surface-2); color: var(--text); }
 .icon-btn.danger:hover { color: var(--danger); }
 
-.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
-.brand-mark {
-  display: grid; place-items: center; width: 30px; height: 30px;
-  border-radius: 9px; background: var(--accent); color: var(--accent-ink);
-}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-mark { width: 30px; height: 30px; flex: none; }
+.wordmark { font-weight: 700; font-size: 21px; letter-spacing: -.035em; line-height: 1; }
 
 /* ---------- Auth ---------- */
 .auth {

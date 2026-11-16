@@ -1,4 +1,4 @@
-/* Allsubs front end.
+/* Recuro front end.
  * Data access goes through a "backend" object: `remote` talks to the server API,
  * `demo` keeps the sample-data mode entirely in this browser. */
 (() => {
@@ -56,7 +56,7 @@
     isActive: () => localStorage.getItem(DEMO_ON) === '1',
     open() {
       try { this.state = JSON.parse(localStorage.getItem(DEMO_KEY)); } catch { this.state = null; }
-      this.state ??= { user: { email: 'demo@allsubs.example', name: 'Demo user', currency: 'USD', theme: 'system' }, subs: sampleSubs() };
+      this.state ??= { user: { email: 'demo@recuro.example', name: 'Demo user', currency: 'USD', theme: 'system' }, subs: sampleSubs() };
       localStorage.setItem(DEMO_ON, '1');
       this.save();
       return this.state.user;

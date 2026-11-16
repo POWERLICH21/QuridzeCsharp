@@ -52,7 +52,7 @@ class Program
 
 ---
 
-# Allsubs — subscription tracker
+# Recuro — subscription tracker
 
 A website where a person signs in and tracks their subscriptions: what they pay per month and per year, and when each one renews.
 

@@ -1,4 +1,4 @@
-# How to run the Allsubs demo on your computer
+# How to run the Recuro demo on your computer
 
 ## 1. Install .NET 10 (one time)
 
