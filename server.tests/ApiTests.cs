@@ -43,7 +43,7 @@ public class ApiTests(AppFactory factory) : IClassFixture<AppFactory>
 {
     private static readonly object Netflixish = new { name = "Video streaming", amount = 15.49, currency = "USD", cycle = "monthly", category = "Streaming", next = "2026-12-01" };
     private record Sub(Guid Id, string Name, decimal Amount, string Currency, string Cycle, string Category, string Next, bool Paused);
-    private record Me(string Email, string Name, string Currency, string Theme, bool TwoFactorEnabled);
+    private record Me(string Email, string Name, string Currency, string Theme, bool TwoFactorEnabled, string? InboundAddress);
     private record Setup(string Secret, string QrSvg);
     private record Enabled(string[] RecoveryCodes);
 

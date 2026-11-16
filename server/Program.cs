@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Subfuse.Server.Api;
 using Subfuse.Server.Data;
+using Subfuse.Server.Import;
 using Subfuse.Server.Security;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,6 +20,12 @@ builder.Services.AddDbContextPool<AppDb>((services, o) =>
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 builder.Services.AddScoped<AccountSecurity>();
+
+// ----- Importing subscriptions from receipts -----
+builder.Services.AddSingleton(Catalog.Load(Path.Combine(builder.Environment.WebRootPath, "catalog.json")));
+builder.Services.AddSingleton<ReceiptReader>();
+// Forwarded-email import stays off until a mail provider is connected and both values are set.
+builder.Services.AddSingleton(new InboundSettings(config["Inbound:Domain"], config["Inbound:Secret"]));
 
 // These keys encrypt session cookies and authenticator secrets. They must survive restarts and be backed up:
 // losing them signs everyone out and breaks authenticator codes (recovery codes keep working).
@@ -50,6 +57,9 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("auth", http => RateLimitPartition.GetFixedWindowLimiter(
         http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = perMinute, Window = TimeSpan.FromMinutes(1) }));
+    // All inbound mail arrives from the provider's few addresses, so this one is a single shared budget.
+    o.AddPolicy("inbound", _ => RateLimitPartition.GetFixedWindowLimiter("inbound",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = config.GetValue("RateLimits:InboundPerMinute", 600), Window = TimeSpan.FromMinutes(1) }));
 });
 
 // ----- Hosting behind a proxy (Cloudflare, a platform's load balancer) -----
@@ -110,6 +120,7 @@ app.UseAuthorization();
 app.MapAuth();
 app.MapAccount();
 app.MapSubscriptions();
+app.MapImport();
 app.MapGet("/healthz", () => Results.Text("ok"));
 
 app.Run();

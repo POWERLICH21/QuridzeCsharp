@@ -56,15 +56,16 @@ h3 { font-size: 16px; }
 .num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: .94em; }
 
 /* ---------- Controls ---------- */
-input, select, button { font: inherit; color: inherit; }
-input, select {
+input, select, textarea, button { font: inherit; color: inherit; }
+textarea { resize: vertical; min-height: 120px; }
+input, select, textarea {
   width: 100%;
   padding: 9px 12px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
-input:focus-visible, select:focus-visible, button:focus-visible {
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
@@ -224,7 +225,10 @@ a { color: var(--accent); }
 .bar-row .val { font-variant-numeric: tabular-nums; color: var(--muted); font-family: var(--mono); font-size: .94em; }
 
 /* Subscriptions */
-.toolbar { display: grid; grid-template-columns: minmax(0, 1fr) 180px 200px; gap: 10px; margin-bottom: 14px; }
+.toolbar { display: grid; grid-template-columns: minmax(0, 1fr) 180px 200px auto; gap: 10px; margin-bottom: 14px; }
+.suggestions { margin-bottom: 14px; border-color: var(--accent); }
+.suggestions .list li { flex-wrap: wrap; }
+.suggestions .row-actions { flex: none; }
 .table-card { padding: 4px 0; overflow-x: auto; }
 .table { width: 100%; border-collapse: collapse; }
 .table th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
@@ -341,7 +345,8 @@ dialog p.muted { margin: 0 0 16px; }
   .list li { gap: 10px; }
 
   .toolbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .toolbar input { grid-column: 1 / -1; }
+  .toolbar input, .toolbar .btn { grid-column: 1 / -1; }
+  textarea { font-size: 16px; }
   /* Table rows become two-line cards: service + price, then renewal + actions */
   .table thead { display: none; }
   .table, .table tbody { display: block; }

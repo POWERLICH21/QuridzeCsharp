@@ -22,11 +22,20 @@ public static class AccountEndpoints
     {
         var me = app.MapGroup("/api/me").RequireAuthorization();
 
-        me.MapGet("", async (ClaimsPrincipal principal, AppDb db) =>
-            await db.Users.FindAsync(principal.UserId()) is { } user ? Results.Ok(UserResponse.From(user)) : Results.Unauthorized());
+        me.MapGet("", async (ClaimsPrincipal principal, AppDb db, InboundSettings inbound) =>
+        {
+            if (await db.Users.FindAsync(principal.UserId()) is not { } user) return Results.Unauthorized();
+            // Accounts created before forwarding existed get their private address the first time it is needed.
+            if (user.InboundToken is null && inbound.Enabled)
+            {
+                user.InboundToken = InboundSettings.NewToken();
+                await db.SaveChangesAsync();
+            }
+            return Results.Ok(UserResponse.From(user, inbound));
+        });
 
         // Only the fields present in the body are changed.
-        me.MapPatch("", async (UpdateAccountRequest req, ClaimsPrincipal principal, AppDb db) =>
+        me.MapPatch("", async (UpdateAccountRequest req, ClaimsPrincipal principal, AppDb db, InboundSettings inbound) =>
         {
             if (await db.Users.FindAsync(principal.UserId()) is not { } user) return Results.Unauthorized();
 
@@ -47,7 +56,7 @@ public static class AccountEndpoints
                 user.Theme = req.Theme;
             }
             await db.SaveChangesAsync();
-            return Results.Ok(UserResponse.From(user));
+            return Results.Ok(UserResponse.From(user, inbound));
         });
 
         // Everything the service holds about the user, as one downloadable file.

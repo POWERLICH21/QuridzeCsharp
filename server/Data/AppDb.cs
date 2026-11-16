@@ -22,6 +22,9 @@ public class User
     /// <summary>Time step of the last accepted authenticator code, so a code cannot be used twice.</summary>
     public long TwoFactorLastStep { get; set; }
 
+    /// <summary>The local part of the user's private address for forwarding receipts. Created on first use.</summary>
+    public string? InboundToken { get; set; }
+
     public int FailedLogins { get; set; }
     public DateTime? LockoutUntil { get; set; }
 
@@ -35,6 +38,24 @@ public class RecoveryCode
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public required string CodeHash { get; set; }
+}
+
+/// <summary>A subscription found in a forwarded email or pasted text, waiting for the user to review it.</summary>
+public class Suggestion
+{
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public required string Name { get; set; }
+    /// <summary>Null when no price could be read; the user fills it in.</summary>
+    public decimal? Amount { get; set; }
+    public required string Currency { get; set; }
+    public required string Cycle { get; set; }
+    public required string Category { get; set; }
+    public DateOnly NextRenewal { get; set; }
+    /// <summary>"email", "paste", or "notice" for a message to show the user (see Note).</summary>
+    public required string Source { get; set; }
+    public string? Note { get; set; }
+    public DateTime CreatedAt { get; set; }
 }
 
 public class Subscription
@@ -56,6 +77,7 @@ public class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
     public DbSet<User> Users => Set<User>();
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
     public DbSet<RecoveryCode> RecoveryCodes => Set<RecoveryCode>();
+    public DbSet<Suggestion> Suggestions => Set<Suggestion>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -66,6 +88,15 @@ public class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
             u.Property(x => x.Name).HasMaxLength(Rules.MaxName);
             u.HasMany(x => x.Subscriptions).WithOne().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Cascade);
             u.HasMany(x => x.RecoveryCodes).WithOne().HasForeignKey(c => c.UserId).OnDelete(DeleteBehavior.Cascade);
+            u.HasMany<Suggestion>().WithOne().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Cascade);
+            u.HasIndex(x => x.InboundToken).IsUnique();
+            u.Property(x => x.InboundToken).HasMaxLength(40);
+        });
+        b.Entity<Suggestion>(s =>
+        {
+            s.Property(x => x.Name).HasMaxLength(Rules.MaxName);
+            s.Property(x => x.Category).HasMaxLength(Rules.MaxCategory);
+            s.Property(x => x.Note).HasMaxLength(200);
         });
         b.Entity<Subscription>(s =>
         {

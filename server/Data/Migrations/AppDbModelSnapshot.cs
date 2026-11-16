@@ -80,6 +80,57 @@ namespace Subfuse.Server.Data.Migrations
                     b.ToTable("Subscriptions");
                 });
 
+            modelBuilder.Entity("Subfuse.Server.Data.Suggestion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("Amount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Cycle")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("NextRenewal")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Suggestions");
+                });
+
             modelBuilder.Entity("Subfuse.Server.Data.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -100,6 +151,10 @@ namespace Subfuse.Server.Data.Migrations
 
                     b.Property<int>("FailedLogins")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("InboundToken")
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LockoutUntil")
                         .HasColumnType("TEXT");
@@ -135,6 +190,9 @@ namespace Subfuse.Server.Data.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
+                    b.HasIndex("InboundToken")
+                        .IsUnique();
+
                     b.ToTable("Users");
                 });
 
@@ -151,6 +209,15 @@ namespace Subfuse.Server.Data.Migrations
                 {
                     b.HasOne("Subfuse.Server.Data.User", null)
                         .WithMany("Subscriptions")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Subfuse.Server.Data.Suggestion", b =>
+                {
+                    b.HasOne("Subfuse.Server.Data.User", null)
+                        .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();

@@ -107,6 +107,10 @@
 
     <!-- Subscriptions -->
     <section class="view" id="view-subscriptions" hidden>
+      <div class="card suggestions" id="suggestions-card" hidden>
+        <div class="card-head"><h3>Found for you</h3><span class="muted small">Review each one before it is added</span></div>
+        <ul class="list" id="suggestions"></ul>
+      </div>
       <div class="toolbar">
         <input id="search" type="search" placeholder="Search subscriptions" aria-label="Search subscriptions">
         <select id="filter-cat" aria-label="Category"></select>
@@ -115,6 +119,7 @@
           <option value="cost">Sort: highest cost</option>
           <option value="name">Sort: name</option>
         </select>
+        <button class="btn" id="import-btn">Import</button>
       </div>
       <div class="card table-card">
         <table class="table">
@@ -177,6 +182,16 @@
         </div>
       </div>
 
+      <div class="card settings" id="forward-card" hidden>
+        <h3>Import by email</h3>
+        <p class="muted small">Forward a subscription receipt to your private address and it will appear under
+          Subscriptions for you to review. Only the service, price and billing cycle are kept; the email itself is not stored.</p>
+        <div class="setting-row">
+          <code id="forward-address"></code>
+          <button class="btn" id="forward-copy">Copy</button>
+        </div>
+      </div>
+
       <div class="card settings">
         <h3>Your data</h3>
         <div class="setting-row" id="export-row">
@@ -228,10 +243,27 @@
       <label class="field"><span>Next renewal</span><input name="next" type="date" required></label>
     </div>
     <label class="field"><span>Category</span><select name="category"></select></label>
+    <p class="muted small" id="sub-hint" hidden>Filled in with the typical US price. Check it matches what you pay.</p>
     <p class="form-error" id="sub-error" role="alert" hidden></p>
     <div class="dialog-actions">
       <button class="btn" type="button" id="sub-cancel">Cancel</button>
       <button class="btn btn-primary" type="submit">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ Import from pasted text ============ -->
+<dialog id="import-dialog">
+  <form id="import-form" method="dialog" novalidate>
+    <h3>Import subscriptions</h3>
+    <p class="muted">Paste a receipt email, or the text of your subscriptions list (for example from your phone's
+      App Store or Google Play settings). Subfuse looks for services and prices it recognises.</p>
+    <label class="field"><span>Pasted text</span>
+      <textarea name="text" rows="8" maxlength="20000" placeholder="Paste here"></textarea></label>
+    <p class="form-error" id="import-error" role="alert" hidden></p>
+    <div class="dialog-actions">
+      <button class="btn" type="button" id="import-cancel">Cancel</button>
+      <button class="btn btn-primary" type="submit">Find subscriptions</button>
     </div>
   </form>
 </dialog>

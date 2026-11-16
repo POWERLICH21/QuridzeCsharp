@@ -9,14 +9,15 @@
   // The currency and cycle lists mirror server/Rules.cs.
   const RATES = { USD: 1, EUR: 0.92, GBP: 0.79, GEL: 2.7, JPY: 150, INR: 84, BRL: 5.6, CAD: 1.38, AUD: 1.52, TRY: 34 };
   const CURRENCIES = Object.keys(RATES);
-  const CATEGORIES = ['Streaming', 'Music', 'Software', 'Cloud', 'Gaming', 'News', 'Fitness', 'Other'];
+  const CATEGORIES = ['AI', 'Streaming', 'Music', 'Software', 'Cloud', 'Gaming', 'News', 'Fitness', 'Other'];
   const CYCLES = {
     weekly: { label: 'Weekly', perMonth: 52 / 12 },
     monthly: { label: 'Monthly', perMonth: 1 },
     quarterly: { label: 'Every 3 months', perMonth: 1 / 3 },
     yearly: { label: 'Yearly', perMonth: 1 / 12 },
   };
-  const SUGGESTIONS = ['Video streaming', 'Music streaming', 'Cloud storage', 'Design tools', 'Game pass', 'News site', 'Gym membership', 'VPN', 'Password manager'];
+  // Known services with typical prices, from catalog.json: plan name (lower case) -> plan details.
+  const catalog = new Map();
 
   // ---------- Backends ----------
   const api = async (method, path, body) => {
@@ -51,6 +52,9 @@
     twoFactorSetup: () => api('POST', '/me/2fa/setup'),
     twoFactorEnable: (code) => api('POST', '/me/2fa/enable', { code }),
     twoFactorDisable: (password, code) => api('POST', '/me/2fa/disable', { password, code }),
+    listSuggestions: () => api('GET', '/suggestions'),
+    dismissSuggestion: (id) => api('DELETE', '/suggestions/' + id),
+    importText: (text) => api('POST', '/import/text', { text }),
   };
 
   // Sample-data mode: same interface, stored in localStorage, never sent to the server.
@@ -71,6 +75,7 @@
     async updateSub(id, data) { const s = Object.assign(this.state.subs.find((x) => x.id === id), data); this.save(); return { ...s }; },
     async deleteSub(id) { this.state.subs = this.state.subs.filter((x) => x.id !== id); this.save(); },
     async updateUser(patch) { Object.assign(this.state.user, patch); this.save(); return { ...this.state.user }; },
+    async listSuggestions() { return []; },
     async signOut() { localStorage.removeItem(DEMO_ON); },
     async deleteAccount() { localStorage.removeItem(DEMO_ON); localStorage.removeItem(DEMO_KEY); },
   };
@@ -133,6 +138,8 @@
   let backend = remote;
   let user = null;
   let subs = [];
+  let suggestions = [];
+  let reviewingId = null; // the suggestion currently open in the add form
   let view = 'overview';
   let authMode = 'signin';
   let editingId = null;
@@ -182,9 +189,10 @@
   const authError = (msg) => { const e = $('#auth-error'); e.textContent = msg; e.hidden = false; };
 
   const enter = async (nextBackend, account) => {
-    const list = await nextBackend.listSubs();
+    const [list, found] = await Promise.all([nextBackend.listSubs(), nextBackend.listSuggestions()]);
     backend = nextBackend;
     subs = list;
+    suggestions = found;
     user = account;
     view = 'overview';
     boot();
@@ -281,7 +289,32 @@
 
   const replaceSub = (updated) => { subs = subs.map((x) => (x.id === updated.id ? updated : x)); render(); };
 
+  const renderSuggestions = () => {
+    $('#suggestions-card').hidden = suggestions.length === 0;
+    $('#import-btn').hidden = backend === demo;
+    $('#suggestions').replaceChildren(...suggestions.map((s) => {
+      const dismiss = el('button.icon-btn', { onclick: () => run(async () => {
+        await backend.dismissSuggestion(s.id);
+        suggestions = suggestions.filter((x) => x !== s);
+        renderSuggestions();
+      }) }, 'Dismiss');
+      if (s.source === 'notice') {
+        return el('li', {},
+          el('div.grow', {}, el('div.name', {}, s.name),
+            el('div.muted.small', {}, 'Enter this code in Gmail, under Settings → Forwarding: ', el('code', {}, s.note ?? ''))),
+          el('div.row-actions', {}, dismiss));
+      }
+      return el('li', {},
+        avatar(s.name),
+        el('div.grow', {}, el('div.name.truncate', {}, s.name),
+          el('div.muted.small', {}, `${CYCLES[s.cycle]?.label ?? s.cycle} · from ${s.source === 'email' ? 'a forwarded email' : 'pasted text'}`)),
+        el('div.num', {}, s.amount == null ? 'price not found' : money(s.amount, s.currency)),
+        el('div.row-actions', {}, el('button.icon-btn', { onclick: () => openDialog(null, s) }, 'Review'), dismiss));
+    }));
+  };
+
   const renderSubscriptions = () => {
+    renderSuggestions();
     const q = $('#search').value.trim().toLowerCase();
     const cat = $('#filter-cat').value;
     const sort = $('#sort').value;
@@ -357,6 +390,8 @@
     const isDemo = backend === demo;
     $('#security-card').hidden = isDemo;
     $('#export-row').hidden = isDemo;
+    $('#forward-card').hidden = !user.inboundAddress;
+    $('#forward-address').textContent = user.inboundAddress ?? '';
     const on = !!user.twoFactorEnabled;
     const status = $('#tfa-status');
     status.textContent = on ? 'On' : 'Off';
@@ -378,16 +413,27 @@
   const dialog = $('#sub-dialog');
   const form = $('#sub-form');
 
-  const openDialog = (sub = null) => {
+  /** Opens the form empty, for editing `sub`, or pre-filled from a `suggestion` to review. */
+  const openDialog = (sub = null, suggestion = null) => {
     editingId = sub?.id ?? null;
-    $('#sub-dialog-title').textContent = sub ? 'Edit subscription' : 'Add subscription';
+    reviewingId = suggestion?.id ?? null;
+    $('#sub-dialog-title').textContent = sub ? 'Edit subscription' : suggestion ? 'Review subscription' : 'Add subscription';
     $('#sub-error').hidden = true;
+    $('#sub-hint').hidden = true;
     form.reset();
     form.currency.value = sub?.currency ?? user.currency;
     form.cycle.value = sub?.cycle ?? 'monthly';
     form.category.value = sub?.category ?? CATEGORIES[0];
     form.next.value = sub ? iso(nextRenewal(sub) ?? parse(sub.next)) : iso(today());
     if (sub) { form.name.value = sub.name; form.amount.value = sub.amount; }
+    if (suggestion) {
+      form.name.value = suggestion.name;
+      form.amount.value = suggestion.amount ?? '';
+      form.currency.value = suggestion.currency;
+      form.cycle.value = suggestion.cycle;
+      form.category.value = CATEGORIES.includes(suggestion.category) ? suggestion.category : 'Other';
+      form.next.value = suggestion.next;
+    }
     dialog.showModal();
   };
 
@@ -408,11 +454,59 @@
     const data = { name, amount, currency: form.currency.value, cycle: form.cycle.value, category: form.category.value, next: form.next.value, paused: existing?.paused ?? false };
     try {
       if (existing) replaceSub(await backend.updateSub(existing.id, data));
-      else { subs.push(await backend.createSub(data)); render(); }
+      else {
+        subs.push(await backend.createSub(data));
+        if (reviewingId) {
+          // Saved as a real subscription, so the suggestion has done its job.
+          const done = reviewingId;
+          suggestions = suggestions.filter((x) => x.id !== done);
+          backend.dismissSuggestion(done).catch(() => {});
+        }
+        render();
+      }
       dialog.close();
     } catch (err) {
       if (err.status === 401) { dialog.close(); run(() => { throw err; }); } else fail(err.message);
     }
+  });
+
+  // Picking a known service fills in its typical price, cycle and category (new subscriptions only).
+  form.name.addEventListener('input', () => {
+    const plan = catalog.get(form.name.value.trim().toLowerCase());
+    if (!plan || editingId) return;
+    form.cycle.value = plan.cycle;
+    form.category.value = CATEGORIES.includes(plan.category) ? plan.category : 'Other';
+    if (plan.amount != null && form.amount.value === '') {
+      form.amount.value = plan.amount;
+      form.currency.value = plan.currency;
+      $('#sub-hint').hidden = false;
+    }
+  });
+
+  // ---------- Import from pasted text ----------
+  const importDialog = $('#import-dialog');
+  const importForm = $('#import-form');
+  $('#import-btn').addEventListener('click', () => { importForm.reset(); $('#import-error').hidden = true; importDialog.showModal(); });
+  $('#import-cancel').addEventListener('click', () => importDialog.close());
+  importForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const box = $('#import-error');
+    try {
+      const { found, added } = await backend.importText(importForm.text.value);
+      if (found === 0) { box.textContent = 'No known services found in that text. You can still add it by hand.'; box.hidden = false; return; }
+      suggestions.push(...added);
+      importDialog.close();
+      renderSuggestions();
+      toast(added.length ? `Found ${added.length} to review.` : 'Those are already in your list.');
+    } catch (err) {
+      if (err.status === 401) { importDialog.close(); run(() => { throw err; }); }
+      else { box.textContent = err.message; box.hidden = false; }
+    }
+  });
+
+  $('#forward-copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(user.inboundAddress); toast('Address copied.'); }
+    catch { toast('Could not copy. Select the address and copy it by hand.'); }
   });
 
   // ---------- Toolbar, calendar and settings events ----------
@@ -532,7 +626,7 @@
   tfaDialog.addEventListener('close', () => { $('#tfa-codes').replaceChildren(); $('#tfa-qr').removeAttribute('src'); $('#tfa-secret').textContent = ''; });
 
   // ---------- Leaving ----------
-  const leave = () => { user = null; subs = []; boot(); };
+  const leave = () => { user = null; subs = []; suggestions = []; boot(); };
   $('#signout-btn').addEventListener('click', () => run(async () => { await backend.signOut(); leave(); }));
   $('#delete-account-btn').addEventListener('click', () => {
     if (backend === demo) {
@@ -561,7 +655,11 @@
   options(form.currency, CURRENCIES);
   options(form.category, CATEGORIES);
   options($('#filter-cat'), ['', ...CATEGORIES], ['All categories', ...CATEGORIES]);
-  $('#service-suggestions').replaceChildren(...SUGGESTIONS.map((s) => el('option', { value: s })));
+  // The catalogue is a convenience: if it fails to load, adding by hand still works.
+  fetch('catalog.json').then((r) => r.json()).then((services) => {
+    for (const service of services) for (const plan of service.plans) catalog.set(plan.name.toLowerCase(), { ...plan, category: service.category });
+    $('#service-suggestions').replaceChildren(...services.flatMap((s) => s.plans.map((p) => el('option', { value: p.name }))));
+  }).catch(() => {});
   $('#cal-dow').replaceChildren(...['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => el('div', {}, d)));
 
   // Resume the sample-data mode or an existing server session, otherwise show sign-in.

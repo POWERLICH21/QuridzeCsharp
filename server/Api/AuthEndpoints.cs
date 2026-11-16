@@ -8,9 +8,10 @@ namespace Subfuse.Server.Api;
 
 public record RegisterRequest(string? Name, string? Email, string? Password);
 public record LoginRequest(string? Email, string? Password, string? Code);
-public record UserResponse(string Email, string Name, string Currency, string Theme, bool TwoFactorEnabled)
+public record UserResponse(string Email, string Name, string Currency, string Theme, bool TwoFactorEnabled, string? InboundAddress)
 {
-    public static UserResponse From(User u) => new(u.Email, u.Name, u.Currency, u.Theme, u.TwoFactorEnabled);
+    public static UserResponse From(User u, InboundSettings inbound) =>
+        new(u.Email, u.Name, u.Currency, u.Theme, u.TwoFactorEnabled, inbound.AddressFor(u));
 }
 
 public static class AuthEndpoints
@@ -19,7 +20,7 @@ public static class AuthEndpoints
     {
         var auth = app.MapGroup("/api/auth").RequireRateLimiting("auth");
 
-        auth.MapPost("/register", async (RegisterRequest req, AppDb db, AccountSecurity security, TimeProvider clock, HttpContext http) =>
+        auth.MapPost("/register", async (RegisterRequest req, AppDb db, AccountSecurity security, TimeProvider clock, InboundSettings inbound, HttpContext http) =>
         {
             var email = Rules.NormalizeEmail(req.Email ?? "");
             if (!Rules.IsEmail(email)) return Rules.Bad("Enter a valid email address.");
@@ -31,7 +32,7 @@ public static class AuthEndpoints
             if (await db.Users.AnyAsync(u => u.Email == email))
                 return Results.Conflict(new { error = "An account with this email already exists. Sign in instead." });
 
-            var user = new User { Id = Guid.NewGuid(), Email = email, Name = name, PasswordHash = "", CreatedAt = clock.GetUtcNow().UtcDateTime };
+            var user = new User { Id = Guid.NewGuid(), Email = email, Name = name, PasswordHash = "", CreatedAt = clock.GetUtcNow().UtcDateTime, InboundToken = InboundSettings.NewToken() };
             user.PasswordHash = security.HashPassword(user, req.Password!);
             db.Users.Add(user);
             try { await db.SaveChangesAsync(); }
@@ -42,10 +43,10 @@ public static class AuthEndpoints
             }
 
             await AccountSecurity.SignIn(http, user);
-            return Results.Ok(UserResponse.From(user));
+            return Results.Ok(UserResponse.From(user, inbound));
         });
 
-        auth.MapPost("/login", async (LoginRequest req, AppDb db, AccountSecurity security, HttpContext http) =>
+        auth.MapPost("/login", async (LoginRequest req, AppDb db, AccountSecurity security, InboundSettings inbound, HttpContext http) =>
         {
             var email = Rules.NormalizeEmail(req.Email ?? "");
             var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email);
@@ -75,7 +76,7 @@ public static class AuthEndpoints
             security.RecordSuccess(user);
             await db.SaveChangesAsync();
             await AccountSecurity.SignIn(http, user);
-            return Results.Ok(UserResponse.From(user));
+            return Results.Ok(UserResponse.From(user, inbound));
         });
 
         auth.MapPost("/logout", async (HttpContext http) =>

@@ -23,8 +23,24 @@ Set these as environment variables on the host. The first two already have these
 | `Proxy__TrustForwardedHeaders` | `true` | Required behind Cloudflare or a platform's load balancer, so the site sees each visitor's real address. Without it the sign-in limiter treats all visitors as one. |
 | `Proxy__ForwardLimit` | number of proxies in front (for example `2` for Cloudflare + the platform) | How many forwarded addresses to trust. Too high lets visitors fake their address; too low limits everyone together. |
 | `RateLimits__AuthPerMinute` | `10` (default) | Sign-in and other sensitive attempts allowed per address per minute. |
+| `Inbound__Domain` | for example `in.subfuse.com` | Turns on "Import by email". Each user gets a private address at this domain. |
+| `Inbound__Secret` | a long random string | The password the mail provider must send with each email. Never put it in the code. |
 
 Only turn on `Proxy__TrustForwardedHeaders` when the server cannot be reached directly from the internet, bypassing the proxy.
+
+## Import by email
+
+Users forward receipts to a private address and the subscriptions appear for review. It stays off until a
+mail provider is connected:
+
+1. Open an account with a provider that receives email and passes it on to a website (Postmark is what the
+   code expects; others need a small adapter).
+2. Point the mail (MX) records of a subdomain such as `in.subfuse.com` at the provider.
+3. Tell the provider to send each email to `https://<your site>/api/inbound/email`, with the secret as the
+   `X-Inbound-Secret` header or as the password of HTTP Basic auth.
+4. Set `Inbound__Domain` and `Inbound__Secret` on the host and restart.
+
+This has been tested with simulated emails only, not with a live provider.
 
 ## Back up `/data`
 
@@ -43,5 +59,7 @@ Only turn on `Proxy__TrustForwardedHeaders` when the server cannot be reached di
 ## Not built yet
 
 - **Email**: password reset, email verification and renewal reminders all need an email-sending service.
+- **Screenshot import**: reading a screenshot of a phone's subscriptions page needs an AI model with an API key. Pasted text works today.
+- **Catalogue prices**: `server/wwwroot/catalog.json` holds typical US prices as last known; review them before launch and from time to time.
 - **Live currency rates**: totals use fixed sample rates.
 - **A larger database**: SQLite on one disk suits a single server. Running several servers at once needs PostgreSQL.
