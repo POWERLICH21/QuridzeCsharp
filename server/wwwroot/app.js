@@ -341,6 +341,12 @@
     }
     $('#cal-grid').replaceChildren(...cells);
     $('#cal-total').textContent = total ? `Charges this month: ${money(total, cur)}` : 'No charges this month.';
+    // Phones show dots in the grid and this list underneath, since names do not fit in the day cells.
+    $('#cal-agenda').replaceChildren(...Object.keys(events).map(Number).sort((x, y) => x - y).flatMap((day) =>
+      events[day].map((sub) => el('li', {},
+        el('span.agenda-day', {}, fmtDate(new Date(y, m, day), { weekday: 'short', day: 'numeric' })),
+        el('div.grow.name.truncate', {}, sub.name),
+        el('div.num', {}, money(sub.amount, sub.currency))))));
   };
 
   const renderSettings = () => {

@@ -2,7 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="Subfuse keeps every subscription you pay for in one place: what you spend each month and when each one renews.">
   <meta name="theme-color" content="#0b0f14">
   <title>Subfuse — every subscription in one place</title>
@@ -87,7 +87,7 @@
   <div class="main">
     <header class="topbar">
       <h2 id="view-title">Overview</h2>
-      <button class="btn btn-primary" id="add-btn">+ Add subscription</button>
+      <button class="btn btn-primary" id="add-btn" aria-label="Add subscription">+ Add<span class="wide-only"> subscription</span></button>
     </header>
 
     <!-- Overview -->
@@ -139,6 +139,7 @@
         <div class="cal-dow" id="cal-dow"></div>
         <div class="cal-grid" id="cal-grid"></div>
         <p class="muted small" id="cal-total"></p>
+        <ul class="list agenda" id="cal-agenda"></ul>
       </div>
     </section>
 

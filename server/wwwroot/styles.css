@@ -104,6 +104,7 @@ a { color: var(--accent); }
 /* ---------- Auth ---------- */
 .auth {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(340px, 440px);
   gap: 56px;
@@ -211,7 +212,7 @@ a { color: var(--accent); }
 .list li:first-child { border-top: 0; padding-top: 0; }
 .list .grow { flex: 1; min-width: 0; }
 .list .name { font-weight: 600; }
-.pill { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; background: var(--surface-2); color: var(--muted); }
+.pill { display: inline-block; white-space: nowrap; padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; background: var(--surface-2); color: var(--muted); }
 .pill.soon { background: var(--warn-bg); color: var(--warn-ink); }
 .empty { color: var(--muted); text-align: center; padding: 28px 12px; margin: 0; }
 
@@ -244,6 +245,8 @@ a { color: var(--accent); }
 .cal-cell.is-today { border-color: var(--accent); }
 .cal-cell.is-today .cal-day { color: var(--accent); font-weight: 700; }
 .cal-day { color: var(--muted); margin-bottom: 4px; }
+.agenda { display: none; margin-top: 16px; }
+.agenda-day { flex: none; width: 62px; color: var(--muted); font-size: 13px; }
 .cal-event { font-family: var(--mono); font-size: 11px; background: var(--accent-soft); color: var(--text); border-radius: 5px; padding: 2px 6px; margin-top: 3px; display: flex; justify-content: space-between; gap: 6px; }
 .cal-event span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #cal-total { margin: 14px 0 0; }
@@ -263,6 +266,7 @@ a { color: var(--accent); }
 dialog {
   border: 1px solid var(--border); border-radius: 16px; padding: 24px;
   width: min(460px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px); overflow-y: auto;
   background: var(--surface); color: var(--text);
 }
 dialog::backdrop { background: rgba(10, 12, 16, .5); }
@@ -293,29 +297,55 @@ dialog p.muted { margin: 0 0 16px; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 900px) {
-  .auth { grid-template-columns: 1fr; gap: 28px; padding: 28px 18px; }
-  .auth-pitch h1 { margin-top: 24px; }
+  /* Sign-in first: name, headline, form, then the details. */
+  .auth { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 24px 18px 40px; align-items: start; align-content: start; min-height: 0; }
+  .auth-pitch { display: contents; }
+  .auth-pitch .brand { order: 1; }
+  .auth-pitch h1 { order: 2; margin: 22px 0 10px; font-size: clamp(26px, 7.2vw, 38px); }
+  .auth-pitch .lead { order: 3; font-size: 16px; margin: 0 0 22px; }
+  .auth-card { order: 4; padding: 20px; }
+  .pitch-list { order: 5; margin-top: 30px; }
+  .preview { order: 6; margin-top: 24px; max-width: none; }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .two-col { grid-template-columns: 1fr; }
+  .two-col { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 720px) {
   .app { grid-template-columns: minmax(0, 1fr); }
   .sidebar {
     position: fixed; top: auto; bottom: 0; left: 0; right: 0; z-index: 5;
-    height: auto; flex-direction: row; padding: 6px;
+    height: auto; flex-direction: row;
+    padding: 6px max(6px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
     border-right: 0; border-top: 1px solid var(--border);
   }
   .sidebar .brand, .sidebar-user { display: none; }
-  .nav { grid-template-columns: repeat(4, 1fr); width: 100%; }
-  .nav-item { flex-direction: column; gap: 2px; font-size: 11px; padding: 6px 2px; align-items: center; }
-  .main { padding: 18px 14px 90px; }
-  .toast { bottom: 84px; }
-  .toolbar { grid-template-columns: 1fr 1fr; }
+  .nav { grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
+  .nav-item { flex-direction: column; gap: 3px; font-size: 11px; padding: 7px 2px; align-items: center; min-height: 48px; justify-content: center; }
+  .nav-item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nav-ico { width: 20px; height: 20px; }
+  .main { padding: 16px 14px calc(96px + env(safe-area-inset-bottom)); min-width: 0; }
+  .toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
+  .topbar { margin-bottom: 16px; }
+  h2 { font-size: 20px; }
+  .card { padding: 16px; }
+
+  /* Comfortable to tap, and 16px text so iPhones do not zoom in when a field is focused. */
+  input, select { font-size: 16px; min-height: 44px; }
+  .btn { min-height: 44px; }
+  .btn-sm { min-height: 40px; padding: 5px 14px; }
+  .icon-btn { min-height: 40px; padding: 8px 10px; }
+  .tab { min-height: 42px; }
+
+  .kpis { gap: 10px; }
+  .kpi-value { font-size: 21px; }
+  .kpi-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .list li { gap: 10px; }
+
+  .toolbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .toolbar input { grid-column: 1 / -1; }
   /* Table rows become two-line cards: service + price, then renewal + actions */
   .table thead { display: none; }
   .table, .table tbody { display: block; }
-  .table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--border); }
   .table tbody tr:last-child { border-bottom: 0; }
   .table td { padding: 0; border: 0; }
   .table td:nth-child(2), .table td:nth-child(3) { display: none; }
@@ -324,6 +354,36 @@ dialog p.muted { margin: 0 0 16px; }
   .table td:nth-child(4) { grid-area: 2 / 1; color: var(--muted); font-size: 13px; }
   .table td:nth-child(6) { grid-area: 2 / 2; }
   .svc { min-width: 0; white-space: normal; }
-  .cal-cell { min-height: 58px; padding: 4px; }
-  .cal-event span:last-child { display: none; }
+  .row-actions { gap: 0; margin-right: -8px; }
+
+  /* Calendar: a dot per charge in the grid, the names in a list underneath. */
+  .cal-dow, .cal-grid { gap: 4px; }
+  .cal-cell { min-height: 46px; padding: 4px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 3px; }
+  .cal-day { width: 100%; margin: 0; }
+  .cal-event { width: 7px; height: 7px; padding: 0; margin: 0; border-radius: 50%; background: var(--accent); }
+  .cal-event span { display: none; }
+  .agenda { display: block; }
+
+  .setting-row { flex-wrap: wrap; gap: 10px; }
+  .setting-row > div { flex: 1 1 200px; }
+
+  /* Dialogs sit at the bottom of the screen, within thumb reach. */
+  dialog { width: 100%; max-width: 100%; margin: auto 0 0; border-radius: 18px 18px 0 0; border-width: 1px 0 0; padding: 20px 18px calc(20px + env(safe-area-inset-bottom)); max-height: 92dvh; }
+  .dialog-actions .btn { flex: 1; }
+  .codes { grid-template-columns: 1fr; }
+  .legal { padding: 24px 18px 60px; }
+  .fineprint a { display: inline-block; padding: 12px 6px; }
+}
+@media (max-width: 480px) {
+  .wide-only { display: none; }
+  .topbar h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+@media (max-width: 380px) {
+  .field-row { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .list .avatar { display: none; }
+  .nav-item { font-size: 10px; letter-spacing: -.01em; }
+  /* Too narrow for date and actions side by side: actions get their own line. */
+  .table td:nth-child(4) { grid-area: 2 / 1 / 3 / 3; }
+  .table td:nth-child(6) { grid-area: 3 / 1 / 4 / 3; }
+  .row-actions { justify-content: flex-start; margin: 0 0 0 -10px; }
 }
