@@ -60,7 +60,7 @@
     isActive: () => localStorage.getItem(DEMO_ON) === '1',
     open() {
       try { this.state = JSON.parse(localStorage.getItem(DEMO_KEY)); } catch { this.state = null; }
-      this.state ??= { user: { email: 'demo@subfuse.example', name: 'Demo user', currency: 'USD', theme: 'system' }, subs: sampleSubs() };
+      this.state ??= { user: { email: 'demo@subfuse.example', name: 'Demo user', currency: 'USD', theme: 'dark' }, subs: sampleSubs() };
       localStorage.setItem(DEMO_ON, '1');
       this.save();
       return this.state.user;
@@ -157,7 +157,7 @@
 
   // ---------- Theme ----------
   const applyTheme = () => {
-    const pref = user?.theme ?? 'system';
+    const pref = user?.theme ?? 'dark'; // Midnight is the default look
     const dark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   };

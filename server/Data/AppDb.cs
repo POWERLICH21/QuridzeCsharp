@@ -10,7 +10,7 @@ public class User
     public required string Name { get; set; }
     public required string PasswordHash { get; set; }
     public string Currency { get; set; } = "USD";
-    public string Theme { get; set; } = "system";
+    public string Theme { get; set; } = "dark";
     public DateTime CreatedAt { get; set; }
 
     /// <summary>Copied into every session cookie. Changing it signs out all existing sessions.</summary>
