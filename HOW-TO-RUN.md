@@ -1,4 +1,4 @@
-# How to run the Recuro demo on your computer
+# How to run the Subfuse demo on your computer
 
 ## 1. Install .NET 10 (one time)
 
@@ -41,6 +41,6 @@ Close the terminal window, or press `Ctrl + C` in it.
 
 ## Good to know
 
-- Your accounts and subscriptions are saved in the file `server/allsubs.db`. Delete that file to start from empty.
-- The site only works on your own computer for now. Other people cannot open it until it is hosted on the internet.
+- Your accounts and subscriptions are saved in the file `server/subfuse.db`, and its encryption keys in `server/keys`. Delete both to start from empty.
+- The site only works on your own computer for now. `DEPLOY.md` explains how to host it on the internet.
 - If the page says "Cannot reach the server", the site is not running: repeat step 3.

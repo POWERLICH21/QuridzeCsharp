@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../server/Allsubs.Server.csproj" />
+    <ProjectReference Include="../server/Subfuse.Server.csproj" />
   </ItemGroup>
 
 </Project>

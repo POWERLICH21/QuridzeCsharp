@@ -5,9 +5,9 @@ VisualStudioVersion = 17.13.35931.197 d17.13
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuridzeC#", "QuridzeC#\QuridzeC#.csproj", "{AB63079A-ABEE-4472-A37F-CF63A59F08D3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Allsubs.Server", "server\Allsubs.Server.csproj", "{7181ABF3-8148-45B5-A77D-E5ED133CA4FE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Subfuse.Server", "server\Subfuse.Server.csproj", "{7181ABF3-8148-45B5-A77D-E5ED133CA4FE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Allsubs.Server.Tests", "server.tests\Allsubs.Server.Tests.csproj", "{D9DEBE73-BF56-4193-A1FF-7AEC28D705F6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Subfuse.Server.Tests", "server.tests\Subfuse.Server.Tests.csproj", "{D9DEBE73-BF56-4193-A1FF-7AEC28D705F6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

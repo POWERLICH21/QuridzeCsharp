@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace Allsubs.Server.Data;
+namespace Subfuse.Server.Data;
 
 public class User
 {
@@ -13,7 +13,28 @@ public class User
     public string Theme { get; set; } = "system";
     public DateTime CreatedAt { get; set; }
 
+    /// <summary>Copied into every session cookie. Changing it signs out all existing sessions.</summary>
+    public string SecurityStamp { get; set; } = Guid.NewGuid().ToString("N");
+
+    /// <summary>Authenticator secret, encrypted with the app's data-protection keys. Set during setup, before 2FA is enabled.</summary>
+    public string? TwoFactorSecret { get; set; }
+    public bool TwoFactorEnabled { get; set; }
+    /// <summary>Time step of the last accepted authenticator code, so a code cannot be used twice.</summary>
+    public long TwoFactorLastStep { get; set; }
+
+    public int FailedLogins { get; set; }
+    public DateTime? LockoutUntil { get; set; }
+
     public List<Subscription> Subscriptions { get; set; } = [];
+    public List<RecoveryCode> RecoveryCodes { get; set; } = [];
+}
+
+/// <summary>A single-use fallback for when the authenticator app is unavailable. Only the hash is stored.</summary>
+public class RecoveryCode
+{
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public required string CodeHash { get; set; }
 }
 
 public class Subscription
@@ -34,6 +55,7 @@ public class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<Subscription> Subscriptions => Set<Subscription>();
+    public DbSet<RecoveryCode> RecoveryCodes => Set<RecoveryCode>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -43,6 +65,7 @@ public class AppDb(DbContextOptions<AppDb> options) : DbContext(options)
             u.Property(x => x.Email).HasMaxLength(254);
             u.Property(x => x.Name).HasMaxLength(Rules.MaxName);
             u.HasMany(x => x.Subscriptions).WithOne().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Cascade);
+            u.HasMany(x => x.RecoveryCodes).WithOne().HasForeignKey(c => c.UserId).OnDelete(DeleteBehavior.Cascade);
         });
         b.Entity<Subscription>(s =>
         {

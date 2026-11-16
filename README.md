@@ -52,13 +52,15 @@ class Program
 
 ---
 
-# Recuro — subscription tracker
+# Subfuse — subscription tracker
 
 A website where a person signs in and tracks their subscriptions: what they pay per month and per year, and when each one renews.
 
 - `server/` — the web app (ASP.NET Core 10, SQLite database). The pages themselves are in `server/wwwroot/`.
 - `server.tests/` — automated tests for the server.
 - `docs/screenshots/` — pictures of the design.
+- `HOW-TO-RUN.md` — run it on your own computer.
+- `DEPLOY.md` — put it on the internet.
 
 ## Run it
 
@@ -69,7 +71,7 @@ cd server
 dotnet run
 ```
 
-Then open the address it prints (for example http://localhost:5000). The database file `allsubs.db` is created automatically on first start.
+Then open http://localhost:5080. The database file `subfuse.db` is created automatically on first start.
 
 ## Run the tests
 

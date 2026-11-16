@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace Allsubs.Server.Data.Migrations
+namespace Subfuse.Server.Data.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration
@@ -21,11 +21,36 @@ namespace Allsubs.Server.Data.Migrations
                     PasswordHash = table.Column<string>(type: "TEXT", nullable: false),
                     Currency = table.Column<string>(type: "TEXT", nullable: false),
                     Theme = table.Column<string>(type: "TEXT", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
+                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    SecurityStamp = table.Column<string>(type: "TEXT", nullable: false),
+                    TwoFactorSecret = table.Column<string>(type: "TEXT", nullable: true),
+                    TwoFactorEnabled = table.Column<bool>(type: "INTEGER", nullable: false),
+                    TwoFactorLastStep = table.Column<long>(type: "INTEGER", nullable: false),
+                    FailedLogins = table.Column<int>(type: "INTEGER", nullable: false),
+                    LockoutUntil = table.Column<DateTime>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Users", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "RecoveryCodes",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    UserId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    CodeHash = table.Column<string>(type: "TEXT", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RecoveryCodes", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_RecoveryCodes_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -54,6 +79,11 @@ namespace Allsubs.Server.Data.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_RecoveryCodes_UserId",
+                table: "RecoveryCodes",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Subscriptions_UserId",
                 table: "Subscriptions",
                 column: "UserId");
@@ -68,6 +98,9 @@ namespace Allsubs.Server.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "RecoveryCodes");
+
             migrationBuilder.DropTable(
                 name: "Subscriptions");
 

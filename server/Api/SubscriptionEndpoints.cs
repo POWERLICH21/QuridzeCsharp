@@ -1,8 +1,9 @@
 using System.Security.Claims;
-using Allsubs.Server.Data;
+using Subfuse.Server.Data;
+using Subfuse.Server.Security;
 using Microsoft.EntityFrameworkCore;
 
-namespace Allsubs.Server.Api;
+namespace Subfuse.Server.Api;
 
 public record SubscriptionRequest(string? Name, decimal? Amount, string? Currency, string? Cycle, string? Category, DateOnly? Next, bool? Paused);
 public record SubscriptionResponse(Guid Id, string Name, decimal Amount, string Currency, string Cycle, string Category, DateOnly Next, bool Paused)
@@ -31,8 +32,6 @@ public static class SubscriptionEndpoints
         {
             if (Validate(req) is { } error) return Rules.Bad(error);
             var userId = principal.UserId();
-            // The account may have been deleted while its cookie is still valid.
-            if (!await db.Users.AnyAsync(u => u.Id == userId)) return Results.Unauthorized();
             if (await db.Subscriptions.CountAsync(s => s.UserId == userId) >= MaxPerUser)
                 return Rules.Bad($"You can track up to {MaxPerUser} subscriptions.");
 

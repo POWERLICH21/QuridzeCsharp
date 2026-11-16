@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace Allsubs.Server;
+namespace Subfuse.Server;
 
 /// <summary>Input rules shared by every endpoint. The lists mirror the ones in wwwroot/app.js.</summary>
 public static partial class Rules
@@ -21,6 +21,14 @@ public static partial class Rules
     public static bool IsEmail(string? s) => s is { Length: <= 254 } && EmailPattern().IsMatch(s);
 
     public static string NormalizeEmail(string s) => s.Trim().ToLowerInvariant();
+
+    /// <summary>Null when the password is acceptable, otherwise the message to show.</summary>
+    public static string? PasswordProblem(string? password) => password switch
+    {
+        null or { Length: < MinPassword } => $"Password must be at least {MinPassword} characters.",
+        { Length: > MaxPassword } => "Password is too long.",
+        _ => null,
+    };
 
     /// <summary>A 400 response in the shape the front end reads: { "error": "..." }.</summary>
     public static IResult Bad(string message) => Results.BadRequest(new { error = message });

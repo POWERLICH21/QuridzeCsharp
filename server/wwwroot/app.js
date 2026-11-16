@@ -1,4 +1,4 @@
-/* Recuro front end.
+/* Subfuse front end.
  * Data access goes through a "backend" object: `remote` talks to the server API,
  * `demo` keeps the sample-data mode entirely in this browser. */
 (() => {
@@ -34,7 +34,7 @@
     const data = await res.json().catch(() => null);
     if (!res.ok) {
       const fallback = res.status === 429 ? 'Too many attempts. Wait a minute and try again.' : 'Something went wrong. Try again.';
-      throw Object.assign(new Error(data?.error ?? fallback), { status: res.status });
+      throw Object.assign(new Error(data?.error ?? fallback), { status: res.status, twoFactorRequired: !!data?.twoFactorRequired });
     }
     return data;
   };
@@ -46,17 +46,21 @@
     deleteSub: (id) => api('DELETE', '/subscriptions/' + id),
     updateUser: (patch) => api('PATCH', '/me', patch),
     signOut: () => api('POST', '/auth/logout'),
-    deleteAccount: () => api('DELETE', '/me'),
+    deleteAccount: (password) => api('POST', '/me/delete', { password }),
+    changePassword: (currentPassword, newPassword) => api('POST', '/me/password', { currentPassword, newPassword }),
+    twoFactorSetup: () => api('POST', '/me/2fa/setup'),
+    twoFactorEnable: (code) => api('POST', '/me/2fa/enable', { code }),
+    twoFactorDisable: (password, code) => api('POST', '/me/2fa/disable', { password, code }),
   };
 
   // Sample-data mode: same interface, stored in localStorage, never sent to the server.
-  const DEMO_KEY = 'allsubs.demo', DEMO_ON = 'allsubs.demo.active';
+  const DEMO_KEY = 'subfuse.demo', DEMO_ON = 'subfuse.demo.active';
   const demo = {
     state: null,
     isActive: () => localStorage.getItem(DEMO_ON) === '1',
     open() {
       try { this.state = JSON.parse(localStorage.getItem(DEMO_KEY)); } catch { this.state = null; }
-      this.state ??= { user: { email: 'demo@recuro.example', name: 'Demo user', currency: 'USD', theme: 'system' }, subs: sampleSubs() };
+      this.state ??= { user: { email: 'demo@subfuse.example', name: 'Demo user', currency: 'USD', theme: 'system' }, subs: sampleSubs() };
       localStorage.setItem(DEMO_ON, '1');
       this.save();
       return this.state.user;
@@ -113,6 +117,7 @@
     if (classes.length) node.className = classes.join(' ');
     for (const [k, v] of Object.entries(attrs)) {
       if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+      else if (k === 'style') node.style.cssText = v; // via the DOM, so the content security policy allows it
       else if (v !== false && v != null) node.setAttribute(k, v);
     }
     node.append(...children.filter((c) => c != null));
@@ -170,6 +175,8 @@
     $('#auth-submit').textContent = mode === 'signup' ? 'Create account' : 'Sign in';
     $('#auth-form [name=password]').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
     $('#auth-error').hidden = true;
+    $('#code-field').hidden = true;
+    $('#auth-form [name=code]').value = '';
   };
 
   const authError = (msg) => { const e = $('#auth-error'); e.textContent = msg; e.hidden = false; };
@@ -198,11 +205,13 @@
     try {
       const account = authMode === 'signup'
         ? await api('POST', '/auth/register', { name: f.name.value, email, password })
-        : await api('POST', '/auth/login', { email, password });
+        : await api('POST', '/auth/login', { email, password, code: f.code.value.trim() || undefined });
       await enter(remote, account);
       f.reset();
+      setAuthMode('signin');
     } catch (err) {
       authError(err.message);
+      if (err.twoFactorRequired) { $('#code-field').hidden = false; f.code.select(); }
     } finally {
       button.disabled = false;
     }
@@ -240,9 +249,9 @@
     const upcoming = list.map((s) => ({ s, d: nextRenewal(s) })).filter((x) => x.d).sort((a, b) => a.d - b.d);
     const first = upcoming[0];
 
-    const kpi = (label, value, sub) => el('div.card', {}, el('div.kpi-label', {}, label), el('div.kpi-value', {}, value), el('div.kpi-sub', {}, sub));
+    const kpi = (label, value, sub, hero) => el(hero ? 'div.card.is-hero' : 'div.card', {}, el('div.kpi-label', {}, label), el('div.kpi-value', {}, value), el('div.kpi-sub', {}, sub));
     $('#kpis').replaceChildren(
-      kpi('Monthly spend', money(monthly, cur), 'averaged across billing cycles'),
+      kpi('Monthly spend', money(monthly, cur), 'averaged across billing cycles', true),
       kpi('Yearly spend', money(monthly * 12, cur), 'at current plans'),
       kpi('Active subscriptions', String(list.length), subs.length - list.length ? `${subs.length - list.length} paused` : 'none paused'),
       kpi('Next renewal', first ? fmtDate(first.d) : '—', first ? `${first.s.name} · ${money(first.s.amount, first.s.currency)}` : 'nothing scheduled'),
@@ -338,6 +347,15 @@
     $('#set-name').value = user.name;
     $('#set-currency').value = user.currency;
     $('#set-theme').value = user.theme;
+    // Password, two-factor and export belong to server accounts; the sample-data mode has none.
+    const isDemo = backend === demo;
+    $('#security-card').hidden = isDemo;
+    $('#export-row').hidden = isDemo;
+    const on = !!user.twoFactorEnabled;
+    const status = $('#tfa-status');
+    status.textContent = on ? 'On' : 'Off';
+    status.classList.toggle('on', on);
+    $('#tfa-btn').textContent = on ? 'Turn off' : 'Turn on';
   };
 
   const render = () => {
@@ -402,11 +420,127 @@
   $('#set-currency').addEventListener('change', (e) => updateUser({ currency: e.target.value }));
   $('#set-theme').addEventListener('change', (e) => updateUser({ theme: e.target.value }));
 
-  const leave = (action) => run(async () => { await action(); user = null; subs = []; boot(); });
-  $('#signout-btn').addEventListener('click', () => leave(() => backend.signOut()));
+  // ---------- "Confirm with your password" dialog ----------
+  const askDialog = $('#ask-dialog');
+  let askSubmit = null;
+  /** Shows a small form; `onSubmit(values)` may throw, and its message is shown in the dialog. */
+  const ask = ({ title, text, fields, submitLabel, danger, onSubmit }) => {
+    $('#ask-title').textContent = title;
+    $('#ask-text').textContent = text;
+    $('#ask-fields').replaceChildren(...fields.map((f) =>
+      el('label.field', {}, el('span', {}, f.label),
+        el('input', { name: f.name, type: f.type ?? 'text', autocomplete: f.autocomplete ?? 'off', placeholder: f.placeholder ?? '', maxlength: '200' }))));
+    const button = $('#ask-submit');
+    button.textContent = submitLabel;
+    button.className = danger ? 'btn btn-danger' : 'btn btn-primary';
+    $('#ask-error').hidden = true;
+    askSubmit = onSubmit;
+    askDialog.showModal();
+  };
+  $('#ask-cancel').addEventListener('click', () => askDialog.close());
+  $('#ask-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const values = Object.fromEntries(new FormData(e.target));
+    const button = $('#ask-submit');
+    button.disabled = true;
+    try {
+      await askSubmit(values);
+      askDialog.close();
+    } catch (err) {
+      if (err.status === 401) { askDialog.close(); run(() => { throw err; }); }
+      else { const box = $('#ask-error'); box.textContent = err.message; box.hidden = false; }
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  const currentPassword = { name: 'password', label: 'Current password', type: 'password', autocomplete: 'current-password' };
+
+  $('#change-password-btn').addEventListener('click', () => ask({
+    title: 'Change password',
+    text: 'Your other devices will be signed out.',
+    fields: [currentPassword, { name: 'next', label: 'New password', type: 'password', autocomplete: 'new-password', placeholder: 'At least 8 characters' }],
+    submitLabel: 'Change password',
+    onSubmit: async ({ password, next }) => {
+      if (next.length < 8) throw new Error('Password must be at least 8 characters.');
+      await backend.changePassword(password, next);
+      toast('Password changed.');
+    },
+  }));
+
+  // ---------- Two-factor sign-in ----------
+  const tfaDialog = $('#tfa-dialog');
+  const tfaForm = $('#tfa-form');
+
+  $('#tfa-btn').addEventListener('click', () => {
+    if (user.twoFactorEnabled) {
+      return ask({
+        title: 'Turn off two-factor sign-in',
+        text: 'Your account will be protected by your password only.',
+        fields: [currentPassword, { name: 'code', label: 'Authenticator code', placeholder: '6-digit code or a recovery code', autocomplete: 'one-time-code' }],
+        submitLabel: 'Turn off',
+        danger: true,
+        onSubmit: async ({ password, code }) => {
+          await backend.twoFactorDisable(password, code.trim());
+          user.twoFactorEnabled = false;
+          render();
+          toast('Two-factor sign-in is off.');
+        },
+      });
+    }
+    run(async () => {
+      const { secret, qrSvg } = await backend.twoFactorSetup();
+      $('#tfa-qr').src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(qrSvg);
+      $('#tfa-secret').textContent = secret.match(/.{1,4}/g).join(' ');
+      $('#tfa-step-scan').hidden = false;
+      $('#tfa-step-codes').hidden = true;
+      $('#tfa-error').hidden = true;
+      tfaForm.reset();
+      tfaDialog.showModal();
+    });
+  });
+
+  tfaForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const box = $('#tfa-error');
+    try {
+      const { recoveryCodes } = await backend.twoFactorEnable(tfaForm.code.value.replace(/\s/g, ''));
+      user.twoFactorEnabled = true;
+      render();
+      $('#tfa-codes').replaceChildren(...recoveryCodes.map((c) => el('li', {}, c)));
+      $('#tfa-step-scan').hidden = true;
+      $('#tfa-step-codes').hidden = false;
+    } catch (err) {
+      if (err.status === 401) { tfaDialog.close(); run(() => { throw err; }); }
+      else { box.textContent = err.message; box.hidden = false; }
+    }
+  });
+  $('#tfa-cancel').addEventListener('click', () => tfaDialog.close());
+  $('#tfa-done').addEventListener('click', () => tfaDialog.close());
+  $('#tfa-copy').addEventListener('click', async () => {
+    const text = $$('#tfa-codes li').map((li) => li.textContent).join('\n');
+    try { await navigator.clipboard.writeText(text); toast('Recovery codes copied.'); }
+    catch { toast('Could not copy. Select the codes and copy them by hand.'); }
+  });
+  // Leaving the recovery codes on screen after closing would be a leak.
+  tfaDialog.addEventListener('close', () => { $('#tfa-codes').replaceChildren(); $('#tfa-qr').removeAttribute('src'); $('#tfa-secret').textContent = ''; });
+
+  // ---------- Leaving ----------
+  const leave = () => { user = null; subs = []; boot(); };
+  $('#signout-btn').addEventListener('click', () => run(async () => { await backend.signOut(); leave(); }));
   $('#delete-account-btn').addEventListener('click', () => {
-    const what = backend === demo ? 'Delete the sample data from this browser?' : 'Delete your account and all of its subscriptions? This cannot be undone.';
-    if (confirm(what)) leave(() => backend.deleteAccount());
+    if (backend === demo) {
+      if (confirm('Delete the sample data from this browser?')) run(async () => { await demo.deleteAccount(); leave(); });
+      return;
+    }
+    ask({
+      title: 'Delete account',
+      text: 'This removes your account and every subscription for good. It cannot be undone.',
+      fields: [currentPassword],
+      submitLabel: 'Delete my account',
+      danger: true,
+      onSubmit: async ({ password }) => { await backend.deleteAccount(password); leave(); },
+    });
   });
 
   // ---------- Boot ----------
