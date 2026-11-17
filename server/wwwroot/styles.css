@@ -343,6 +343,15 @@ dialog p.muted { margin: 0 0 16px; }
   .kpi-value { font-size: 21px; }
   .kpi-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .list li { gap: 10px; }
+  /* Suggestions: name on the first line, price and actions on the second. */
+  .suggestions .card-head { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .suggestions .list li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; align-items: center; }
+  .suggestions .list li .avatar { grid-row: 1 / 3; align-self: start; }
+  .suggestions .list li .grow { grid-column: 2; }
+  .suggestions .list li .num { grid-column: 2; text-align: left; }
+  .suggestions .list li .row-actions { grid-column: 2; justify-content: flex-start; margin-left: -10px; }
+  .suggestions .list li .grow:first-child { grid-column: 1 / -1; }
+  .suggestions .list li .grow:first-child ~ .row-actions { grid-column: 1 / -1; }
 
   .toolbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .toolbar input, .toolbar .btn { grid-column: 1 / -1; }
